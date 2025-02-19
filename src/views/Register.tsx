@@ -33,12 +33,14 @@ NEXT_PUBLIC_LOCAL_SERVER: process.env.LOCAL_SERVER
 const Register = ({ mode }: { mode: Mode }) => {
   // States
   const [isPasswordShown, setIsPasswordShown] = useState(false)
+
   const [formData, setFormData] = useState({
     first_name: 'John',
     last_name: 'Doe',
     email: 'john.doe@example.com',
     password: 'password123'
   })
+
   const [message, setMessage] = useState('')
 
   // Vars
@@ -52,6 +54,7 @@ const Register = ({ mode }: { mode: Mode }) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
+
     setFormData({ ...formData, [name]: value })
   }
 
@@ -61,24 +64,29 @@ const Register = ({ mode }: { mode: Mode }) => {
     // Client-side validation
     if (!formData.first_name || !formData.last_name || !formData.email || !formData.password) {
       setMessage('All fields are required.')
-      return
+      
+return
     }
 
     // Basic email format validation
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
     if (!emailPattern.test(formData.email)) {
       setMessage('Please enter a valid email address.')
-      return
+      
+return
     }
 
     // Basic password strength validation
     if (formData.password.length < 6) {
       setMessage('Password must be at least 6 characters long.')
-      return
+      
+return
     }
 
     try {
       console.log('Fetch URL:', `${process.env.NEXT_PUBLIC_LOCAL_SERVER}/api/register`)
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_SERVER}/api/register`, {
         method: 'POST',
         headers: {
@@ -88,6 +96,7 @@ const Register = ({ mode }: { mode: Mode }) => {
       })
 
       const data = await response.json()
+
       console.log('API Response:', data) // Log the response for debugging
 
       if (response.ok) {

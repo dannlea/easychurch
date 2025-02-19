@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
-import axios from 'axios'
+
 import { cookies } from 'next/headers'
+
+import axios from 'axios'
 
 const BASE_URL = 'https://api.planningcenteronline.com/people/v2'
 
@@ -11,14 +13,11 @@ export async function GET(request: Request) {
 
     if (!accessToken) {
       console.log('No access token found, redirecting to auth')
+
       return NextResponse.redirect(new URL('/api/planning-center/auth', request.url))
     }
 
     console.log('Using Access Token:', accessToken) // Log the access token
-
-    const { searchParams } = new URL(request.url)
-
-    //console.log("Fetching data for month:", month); // Log the month
 
     let allPeopleData: any[] = []
     let allIncludedData: any[] = [] // Initialize an array to collect all included data
@@ -58,6 +57,7 @@ export async function GET(request: Request) {
 
       // Find the address related to the person
       const addressData = person.relationships.addresses.data[0]
+
       const address = addressData
         ? allIncludedData.find((item: any) => item.id === addressData.id && item.type === 'Address')
         : null
@@ -104,6 +104,7 @@ export async function GET(request: Request) {
 
     if (error.response?.status === 401) {
       console.log('Unauthorized, redirecting to auth')
+
       return NextResponse.redirect(new URL('/api/planning-center/auth', request.url))
     }
 

@@ -1,7 +1,9 @@
 'use client'
-import React, { useState, useEffect, ChangeEvent } from 'react'
+import React, { useState, useEffect } from 'react'
 
 // MUI Imports
+import { useRouter } from 'next/navigation'
+
 import Typography from '@mui/material/Typography'
 import Card from '@mui/material/Card'
 import Grid from '@mui/material/Grid'
@@ -10,7 +12,6 @@ import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
-import type { SelectChangeEvent } from '@mui/material/Select'
 
 // Third-party Imports
 import axios from 'axios'
@@ -20,7 +21,6 @@ import CustomAvatar from '@core/components/mui/Avatar'
 
 // Styles Imports
 import tableStyles from '@core/styles/table.module.css'
-import { useRouter } from 'next/navigation'
 
 interface Person {
   id: string
@@ -40,6 +40,7 @@ const formatDate = (dateString: string) => {
     month: 'long',
     day: 'numeric'
   }
+
   return new Date(dateString).toLocaleDateString(undefined, options)
 }
 
@@ -56,6 +57,7 @@ const BirthdayTable = () => {
     const fetchAllPeople = async () => {
       try {
         setLoading(true)
+
         // Ensure the API endpoint is correct and accessible
         const response = await axios.get('/api/planning-center/people', {
           // Include headers if authentication is required
@@ -63,9 +65,11 @@ const BirthdayTable = () => {
             Authorization: `Bearer YOUR_ACCESS_TOKEN` // Update with actual token if needed
           }
         })
+
         const data = response.data
 
         const groupedByMonth = groupPeopleByMonth(data)
+
         setPeopleByMonth(groupedByMonth)
         setFilteredPeople(groupedByMonth[currentMonth.toString()] || [])
       } catch (err: any) {
@@ -87,9 +91,11 @@ const BirthdayTable = () => {
 
     people.forEach(person => {
       const birthMonth = new Date(person.birthdate).getMonth() + 1
+
       if (!grouped[birthMonth]) {
         grouped[birthMonth] = []
       }
+
       grouped[birthMonth].push(person)
     })
 
@@ -98,6 +104,7 @@ const BirthdayTable = () => {
       grouped[month].sort((a, b) => {
         const dayA = new Date(a.birthdate).getDate()
         const dayB = new Date(b.birthdate).getDate()
+
         return dayA - dayB
       })
     })
@@ -194,10 +201,8 @@ const BirthdayTable = () => {
                       key={person.id}
                       style={{
                         backgroundColor: (() => {
-                          const femaleBase = 'rgb(255, 182, 193)'
-                          const maleBase = 'rgb(173, 216, 230)'
-
                           let opacity
+
                           if (person.ageNext <= 10) {
                             opacity = 0.08
                           } else if (person.ageNext <= 18) {
@@ -216,6 +221,7 @@ const BirthdayTable = () => {
                       onMouseEnter={e => {
                         e.currentTarget.style.backgroundColor = (() => {
                           let opacity
+
                           if (person.ageNext <= 10) {
                             opacity = 0.15
                           } else if (person.ageNext <= 18) {
@@ -232,6 +238,7 @@ const BirthdayTable = () => {
                       onMouseLeave={e => {
                         e.currentTarget.style.backgroundColor = (() => {
                           let opacity
+
                           if (person.ageNext <= 10) {
                             opacity = 0.08
                           } else if (person.ageNext <= 18) {

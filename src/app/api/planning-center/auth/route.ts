@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+
+import { NextResponse } from 'next/server'
 
 const CLIENT_ID = process.env.PC_CLIENT_ID
 const REDIRECT_URI = process.env.PC_REDIRECT_URI
@@ -27,7 +28,8 @@ export async function GET() {
     return NextResponse.redirect(authUrl)
   } catch (error: any) {
     console.error('Auth route error:', error)
-    return NextResponse.json(
+    
+return NextResponse.json(
       {
         error: 'Failed to generate authorization URL',
         details: error.message

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
-import axios from 'axios'
+
 import { cookies } from 'next/headers'
+
+import axios from 'axios'
 
 const CLIENT_ID = process.env.PC_CLIENT_ID
 const CLIENT_SECRET = process.env.PC_CLIENT_SECRET
@@ -18,7 +20,8 @@ export async function GET(request: Request) {
 
     if (!code) {
       console.log('No authorization code found')
-      return NextResponse.redirect(new URL('/login', request.url))
+      
+return NextResponse.redirect(new URL('/login', request.url))
     }
 
     // Exchange the authorization code for an access token
@@ -44,6 +47,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${BASE_URL}/`)
   } catch (error: any) {
     console.error('Error during token exchange:', error)
-    return NextResponse.redirect(`${BASE_URL}/login`)
+    
+return NextResponse.redirect(`${BASE_URL}/login`)
   }
 }
