@@ -81,7 +81,7 @@ const BirthdayTable = () => {
     }
 
     fetchAllPeople()
-  }, [router])
+  }, [router, currentMonth])
   useEffect(() => {
     setFilteredPeople(peopleByMonth[selectedMonth] || [])
   }, [selectedMonth, peopleByMonth])
