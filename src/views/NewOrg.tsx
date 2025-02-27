@@ -11,11 +11,8 @@ import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
 import TextField from '@mui/material/TextField'
-import IconButton from '@mui/material/IconButton'
-import InputAdornment from '@mui/material/InputAdornment'
-import Checkbox from '@mui/material/Checkbox'
 import Button from '@mui/material/Button'
-import FormControlLabel from '@mui/material/FormControlLabel'
+import MenuItem from '@mui/material/MenuItem'
 
 // Type Imports
 import type { Mode } from '@core/types'
@@ -29,16 +26,17 @@ import { useImageVariant } from '@core/hooks/useImageVariant'
 
 NEXT_PUBLIC_LOCAL_SERVER: process.env.LOCAL_SERVER
 
-const Register = ({ mode }: { mode: Mode }) => {
+const NewOrg = ({ mode }: { mode: Mode }) => {
   // States
-  const [isPasswordShown, setIsPasswordShown] = useState(false)
-
   const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
+    name: '',
     password: '',
-    terms: ''
+    terms: '',
+    address: '',
+    state: '',
+    zip_code: '',
+    country: '',
+    subscription_tier: 'Free'
   })
 
   const [message, setMessage] = useState('')
@@ -50,8 +48,6 @@ const Register = ({ mode }: { mode: Mode }) => {
   // Hooks
   const authBackground = useImageVariant(mode, lightImg, darkImg)
 
-  const handleClickShowPassword = () => setIsPasswordShown(show => !show)
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
 
@@ -62,8 +58,14 @@ const Register = ({ mode }: { mode: Mode }) => {
     e.preventDefault()
 
     // Client-side validation
-    if (!formData.first_name || !formData.last_name || !formData.email || !formData.password) {
+    if (!formData.name || !formData.password) {
       setMessage('All fields are required.')
+
+      return
+    }
+
+    if (!formData.terms) {
+      setMessage('You must agree to our ')
 
       return
     }
@@ -71,7 +73,7 @@ const Register = ({ mode }: { mode: Mode }) => {
     // Basic email format validation
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-    if (!emailPattern.test(formData.email)) {
+    if (!emailPattern.test(formData.name)) {
       setMessage('Please enter a valid email address.')
 
       return
@@ -85,9 +87,9 @@ const Register = ({ mode }: { mode: Mode }) => {
     }
 
     try {
-      console.log('Fetch URL:', `${process.env.NEXT_PUBLIC_LOCAL_SERVER}/auth/register`)
+      console.log('Fetch URL:', `${process.env.NEXT_PUBLIC_LOCAL_SERVER}/register`)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_SERVER}/auth/register`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_SERVER}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -117,77 +119,71 @@ const Register = ({ mode }: { mode: Mode }) => {
           <Link href='/' className='flex justify-center items-start mbe-6'>
             <Logo />
           </Link>
-          <Typography variant='h4'>You&apos;ve got a lot on your plate.</Typography>
+          <Typography variant='h4'>Welcome, [First Name]!</Typography>
           <div className='flex flex-col gap-5'>
-            <Typography className='mbs-1'>We help you make time for the things that only you can do.</Typography>
-            <Typography className='mbs-1'>Let&apos;s get started. Tell us about yourself:</Typography>
+            <Typography className='mbs-1'>
+              We&apos;re almost there - Just tell us about the place you call home.
+            </Typography>
+
             <form noValidate autoComplete='off' onSubmit={handleSubmit} className='flex flex-col gap-5'>
               <TextField
                 autoFocus
                 fullWidth
-                label='First Name'
-                name='first_name'
-                value={formData.first_name}
+                label='Church Name'
+                name='name'
+                value={formData.name}
                 onChange={handleChange}
                 required
               />
               <TextField
                 fullWidth
-                label='Last Name'
-                name='last_name'
-                value={formData.last_name}
+                label='Address'
+                name='address'
+                value={formData.address}
                 onChange={handleChange}
                 required
               />
-              <TextField fullWidth label='Email' name='email' value={formData.email} onChange={handleChange} required />
+              <TextField fullWidth label='State' name='state' value={formData.state} onChange={handleChange} required />
               <TextField
                 fullWidth
-                label='Password'
-                name='password'
-                type={isPasswordShown ? 'text' : 'password'}
-                value={formData.password}
+                label='Zip Code'
+                name='zip_code'
+                value={formData.zip_code}
                 onChange={handleChange}
                 required
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position='end'>
-                      <IconButton
-                        size='small'
-                        edge='end'
-                        onClick={handleClickShowPassword}
-                        onMouseDown={e => e.preventDefault()}
-                      >
-                        <i className={isPasswordShown ? 'ri-eye-off-line' : 'ri-eye-line'} />
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
               />
-              <FormControlLabel
-                control={<Checkbox />}
-                name='terms'
-                value={formData.terms}
+              <TextField
+                fullWidth
+                label='Country'
+                name='country'
+                value={formData.country}
+                onChange={handleChange}
                 required
-                label={
-                  <>
-                    <span>I agree to </span>
-                    <Link className='text-primary' href='/terms' onClick={e => e.preventDefault()} target='_blank'>
-                      privacy policy & terms
-                    </Link>
-                  </>
-                }
               />
+              <TextField
+                fullWidth
+                label='Subscription Tier'
+                name='subscription_tier'
+                value={formData.subscription_tier}
+                onChange={handleChange}
+                select
+                required
+              >
+                <MenuItem value='Free'>Free</MenuItem>
+                <MenuItem value='Basic'>Basic</MenuItem>
+                <MenuItem value='Premium'>Premium</MenuItem>
+              </TextField>
               <Button fullWidth variant='contained' type='submit'>
-                Sign Up
+                Create Organization
               </Button>
               {message && <Typography color='error'>{message}</Typography>}
-              <div className='flex justify-center items-center flex-wrap gap-2'>
-                <Typography>Already have an account?</Typography>
-                <Typography component={Link} href='/login' color='primary'>
-                  Sign in instead
-                </Typography>
-              </div>
             </form>
+            <Typography variant='body2' align='center' className='mt-4'>
+              Is your organization already on EasyChurch?
+            </Typography>
+            <Typography variant='body2' align='center' className='mt-0'>
+              Ask your organization admin to link your email to the organization in Org Settings.
+            </Typography>
           </div>
         </CardContent>
       </Card>
@@ -196,4 +192,4 @@ const Register = ({ mode }: { mode: Mode }) => {
   )
 }
 
-export default Register
+export default NewOrg

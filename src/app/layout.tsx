@@ -10,6 +10,9 @@ import '@/app/globals.css'
 // Generated Icon CSS Imports
 import '@assets/iconify-icons/generated-icons.css'
 
+// Import UserProvider
+import { UserProvider } from '@core/contexts/UserContext'
+
 export const metadata = {
   title: 'EasyChurch',
   description: 'Simplify your Church Management needs.'

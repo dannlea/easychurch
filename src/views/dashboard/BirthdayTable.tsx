@@ -51,6 +51,9 @@ const BirthdayTable = () => {
   const [filteredPeople, setFilteredPeople] = useState<Person[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [peopleWithoutBirthdays, setPeopleWithoutBirthdays] = useState<number>(0)
+  const [totalPeople, setTotalPeople] = useState<number>(0)
+  const [peopleReceived, setPeopleReceived] = useState<number>(0)
   const router = useRouter()
 
   useEffect(() => {
@@ -58,23 +61,33 @@ const BirthdayTable = () => {
       try {
         setLoading(true)
 
-        // Ensure the API endpoint is correct and accessible
         const response = await axios.get('/api/planning-center/people', {
-          // Include headers if authentication is required
           headers: {
-            Authorization: `Bearer YOUR_ACCESS_TOKEN` // Update with actual token if needed
+            Authorization: `Bearer YOUR_ACCESS_TOKEN`
           }
         })
 
         const data = response.data
 
-        const groupedByMonth = groupPeopleByMonth(data)
+        console.log('API Response:', data)
+
+        setTotalPeople(data.length)
+
+        const peopleWithBirthdays = data.filter((person: Person) => person.birthdate !== 'Unknown')
+
+        console.log('People with Birthdays:', peopleWithBirthdays.length)
+
+        setPeopleWithoutBirthdays(data.length - peopleWithBirthdays.length)
+        console.log('People without Birthdays:', data.length - peopleWithBirthdays.length)
+
+        const groupedByMonth = groupPeopleByMonth(peopleWithBirthdays)
 
         setPeopleByMonth(groupedByMonth)
         setFilteredPeople(groupedByMonth[currentMonth.toString()] || [])
       } catch (err: any) {
         console.error('Fetch error:', err)
         setError('Failed to fetch people from Planning Center')
+        router.push('/api/planning-center/auth')
       } finally {
         setLoading(false)
       }
@@ -82,9 +95,31 @@ const BirthdayTable = () => {
 
     fetchAllPeople()
   }, [router, currentMonth])
+
   useEffect(() => {
     setFilteredPeople(peopleByMonth[selectedMonth] || [])
   }, [selectedMonth, peopleByMonth])
+
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const response = await axios.get('/api/planning-center/people?progress')
+
+        setPeopleReceived(response.data.progress)
+
+        // Stop polling if all data is received
+        if (response.data.progress >= totalPeople) {
+          clearInterval(intervalId)
+        }
+      } catch (err) {
+        console.error('Error fetching progress:', err)
+      }
+    }
+
+    const intervalId = setInterval(fetchProgress, 1000) // Poll every second
+
+    return () => clearInterval(intervalId) // Cleanup on unmount
+  }, [totalPeople])
 
   const groupPeopleByMonth = (people: Person[]) => {
     const grouped: Record<string, Person[]> = {}
@@ -174,8 +209,8 @@ const BirthdayTable = () => {
                 {loading ? (
                   <tr>
                     <td colSpan={4}>
-                      <Typography align='center' className='animate-pulse'>
-                        Loading...
+                      <Typography align='center' className='animate-pulse italic'>
+                        Loading... {peopleReceived} people received
                       </Typography>
                     </td>
                   </tr>
@@ -309,6 +344,11 @@ const BirthdayTable = () => {
             </table>
           </div>
         </Card>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+          <Typography variant='body2' color='text.secondary' align='center' sx={{ fontStyle: 'italic', opacity: 0.6 }}>
+            There are {peopleWithoutBirthdays} users in your People database without birthdays.
+          </Typography>
+        </div>
       </Grid>
     </Grid>
   )

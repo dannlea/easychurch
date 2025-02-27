@@ -6,6 +6,8 @@ import axios from 'axios'
 
 const BASE_URL = 'https://api.planningcenteronline.com/people/v2'
 
+let progress = 0 // Track progress
+
 export async function GET(request: Request) {
   try {
     // Retrieve the access token from the cookie
@@ -19,12 +21,15 @@ export async function GET(request: Request) {
 
     console.log('Using Access Token:', accessToken) // Log the access token
 
+    if (request.url.includes('progress')) {
+      return NextResponse.json({ progress })
+    }
+
     let allPeopleData: any[] = []
     let allIncludedData: any[] = [] // Initialize an array to collect all included data
     let nextPage = `${BASE_URL}/people?per_page=100&include=emails,addresses&where[status]=active&order=birthdate`
 
     while (nextPage) {
-      //console.log(`Fetching page: ${nextPage}`)
       const response = await axios.get(nextPage, {
         headers: {
           Authorization: `Bearer ${accessToken}`
@@ -38,22 +43,37 @@ export async function GET(request: Request) {
       if (peopleData.length > 0) {
         allPeopleData = [...allPeopleData, ...peopleData]
         allIncludedData = [...allIncludedData, ...includedData] // Collect included data
+        progress = allPeopleData.length // Update progress
       }
 
       nextPage = response.data.links.next || null // Update nextPage with the next link
     }
 
     const formattedData = allPeopleData.map((person: any) => {
-      const birthdate = new Date(person.attributes.birthdate)
-      const formattedBirthdate = isNaN(birthdate.getTime()) ? 'Unknown' : birthdate.toLocaleDateString()
+      const birthdateString = person.attributes.birthdate ?? null
+      const birthdate = birthdateString ? new Date(birthdateString) : null
 
-      // Calculate age at next birthday
-      const birthYear = birthdate.getFullYear()
-      const birthMonthDay = birthdate.toISOString().slice(5, 10)
+      const formattedBirthdate =
+        birthdate instanceof Date && !isNaN(birthdate.getTime()) ? birthdate.toLocaleDateString() : 'Unknown'
+
+      let birthYear: number | null = null
+      let birthMonthDay: string | null = null
+
+      if (birthdate !== null) {
+        birthYear = birthdate.getFullYear()
+        birthMonthDay = birthdate.toISOString().slice(5, 10)
+      }
+
       const currentYear = new Date().getFullYear()
       const currentMonthDay = new Date().toISOString().slice(5, 10)
-      const currentAge = currentYear - birthYear
-      const ageNext = birthMonthDay > currentMonthDay ? currentAge : currentAge + 1
+      const currentAge = birthYear !== null ? currentYear - birthYear : null
+
+      const ageNext =
+        birthYear !== null && birthMonthDay !== null && birthMonthDay > currentMonthDay
+          ? currentAge
+          : currentAge !== null
+            ? currentAge + 1
+            : null
 
       // Find the address related to the person
       const addressData = person.relationships.addresses.data[0]
