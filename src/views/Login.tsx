@@ -74,9 +74,18 @@ const Login = ({ mode }: { mode: Mode }) => {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    setError('')
+
+    // Get the backend URL from environment variable with fallback for development
+    const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER || 'http://localhost:3001'
+
+    // Ensure backendUrl doesn't end with a slash
+    const baseUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_SERVER}/auth/login`, {
+      console.log(`Attempting to login via: ${baseUrl}/auth/login`)
+
+      const response = await fetch(`${baseUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -84,7 +93,9 @@ const Login = ({ mode }: { mode: Mode }) => {
 
       const responseText = await response.text()
 
-      console.log('Raw response text:', responseText)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Raw response text:', responseText)
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error ${response.status}: ${responseText}`)
@@ -94,13 +105,18 @@ const Login = ({ mode }: { mode: Mode }) => {
         const data = JSON.parse(responseText)
         const { token } = data
 
-        console.log('Token received:', token)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Token received:', token)
+        }
+
         localStorage.setItem('token', token)
 
         // Decode the token to get user information
         const userInfo = jwtDecode<JwtPayload>(token) as User
 
-        console.log('Decoded User Info:', userInfo)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Decoded User Info:', userInfo)
+        }
 
         // Update the user context
         setUser(userInfo)

@@ -2,9 +2,11 @@
 
 // React Imports
 import { useState } from 'react'
+import type { FormEvent } from 'react'
 
 // Next Imports
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -13,16 +15,20 @@ import Typography from '@mui/material/Typography'
 import TextField from '@mui/material/TextField'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
-import Checkbox from '@mui/material/Checkbox'
 import Button from '@mui/material/Button'
-import FormControlLabel from '@mui/material/FormControlLabel'
+import FormHelperText from '@mui/material/FormHelperText'
+import FormControl from '@mui/material/FormControl'
+import InputLabel from '@mui/material/InputLabel'
+import OutlinedInput from '@mui/material/OutlinedInput'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
 
 // Type Imports
 import type { Mode } from '@core/types'
 
 // Component Imports
-import Illustrations from '@components/Illustrations'
 import Logo from '@components/layout/shared/Logo'
+import Illustrations from '@components/Illustrations'
 
 // Hook Imports
 import { useImageVariant } from '@core/hooks/useImageVariant'
@@ -30,18 +36,16 @@ import { useImageVariant } from '@core/hooks/useImageVariant'
 NEXT_PUBLIC_LOCAL_SERVER: process.env.LOCAL_SERVER
 
 const Register = ({ mode }: { mode: Mode }) => {
-  // States
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [role, setRole] = useState('')
   const [isPasswordShown, setIsPasswordShown] = useState(false)
-
-  const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    password: '',
-    terms: ''
-  })
-
-  const [message, setMessage] = useState('')
+  const [isPasswordConfirmShown, setIsPasswordConfirmShown] = useState(false)
+  const [error, setError] = useState('')
+  const router = useRouter()
 
   // Vars
   const darkImg = '/images/pages/auth-v1-mask-dark.png'
@@ -51,62 +55,58 @@ const Register = ({ mode }: { mode: Mode }) => {
   const authBackground = useImageVariant(mode, lightImg, darkImg)
 
   const handleClickShowPassword = () => setIsPasswordShown(show => !show)
+  const handleClickShowPasswordConfirm = () => setIsPasswordConfirmShown(show => !show)
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-
-    setFormData({ ...formData, [name]: value })
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    setError('')
 
-    // Client-side validation
-    if (!formData.first_name || !formData.last_name || !formData.email || !formData.password) {
-      setMessage('All fields are required.')
-
-      return
-    }
-
-    // Basic email format validation
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-    if (!emailPattern.test(formData.email)) {
-      setMessage('Please enter a valid email address.')
+    if (password !== passwordConfirm) {
+      setError('Passwords do not match')
 
       return
     }
 
-    // Basic password strength validation
-    if (formData.password.length < 6) {
-      setMessage('Password must be at least 6 characters long.')
+    if (role === '') {
+      setError('Role is required')
 
       return
     }
+
+    // Get the backend URL from environment variable with fallback for development
+    const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER || 'http://localhost:3001'
+
+    // Ensure backendUrl doesn't end with a slash
+    const baseUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl
 
     try {
-      console.log('Fetch URL:', `${process.env.NEXT_PUBLIC_LOCAL_SERVER}/auth/register`)
+      console.log(`Attempting to register via: ${baseUrl}/auth/register`)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_SERVER}/auth/register`, {
+      const response = await fetch(`${baseUrl}/auth/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email,
+          password,
+          role
+        })
       })
 
       const data = await response.json()
 
-      console.log('API Response:', data) // Log the response for debugging
+      if (!response.ok) {
+        setError(data.message || 'Registration failed')
 
-      if (response.ok) {
-        setMessage(data.message || 'Registration successful!')
-      } else {
-        setMessage(`Error: ${data.message || 'Unknown error'}`)
+        return
       }
+
+      // Redirect to login page after successful registration
+      router.push('/login')
     } catch (error) {
-      console.error('Error:', error) // Log detailed error information
-      setMessage('An error occurred. Please try again.')
+      console.error('Error:', error)
+      setError('An error occurred. Please try again.')
     }
   }
 
@@ -114,73 +114,79 @@ const Register = ({ mode }: { mode: Mode }) => {
     <div className='flex flex-col justify-center items-center min-bs-[100dvh] relative p-6'>
       <Card className='flex flex-col sm:is-[450px]'>
         <CardContent className='p-6 sm:!p-12'>
-          <Link href='/' className='flex justify-center items-start mbe-6'>
+          <Link href='/' className='flex justify-center items-center mbe-6'>
             <Logo />
           </Link>
-          <Typography variant='h4'>You&apos;ve got a lot on your plate.</Typography>
           <div className='flex flex-col gap-5'>
-            <Typography className='mbs-1'>We help you make time for the things that only you can do.</Typography>
-            <Typography className='mbs-1'>Let&apos;s get started. Tell us about yourself:</Typography>
+            <div>
+              <Typography variant='h4'>{`Adventure starts here 🚀`}</Typography>
+              <Typography className='mbs-1'>Make your app management easy and fun!</Typography>
+            </div>
             <form noValidate autoComplete='off' onSubmit={handleSubmit} className='flex flex-col gap-5'>
               <TextField
                 autoFocus
                 fullWidth
                 label='First Name'
-                name='first_name'
-                value={formData.first_name}
-                onChange={handleChange}
-                required
+                value={firstName}
+                onChange={e => setFirstName(e.target.value)}
               />
-              <TextField
-                fullWidth
-                label='Last Name'
-                name='last_name'
-                value={formData.last_name}
-                onChange={handleChange}
-                required
-              />
-              <TextField fullWidth label='Email' name='email' value={formData.email} onChange={handleChange} required />
-              <TextField
-                fullWidth
-                label='Password'
-                name='password'
-                type={isPasswordShown ? 'text' : 'password'}
-                value={formData.password}
-                onChange={handleChange}
-                required
-                InputProps={{
-                  endAdornment: (
+              <TextField fullWidth label='Last Name' value={lastName} onChange={e => setLastName(e.target.value)} />
+              <TextField fullWidth label='Email' type='email' value={email} onChange={e => setEmail(e.target.value)} />
+              <FormControl fullWidth>
+                <InputLabel id='role-label'>Role</InputLabel>
+                <Select labelId='role-label' value={role} label='Role' onChange={e => setRole(e.target.value)}>
+                  <MenuItem value='admin'>Admin</MenuItem>
+                  <MenuItem value='user'>User</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel htmlFor='auth-register-password'>Password</InputLabel>
+                <OutlinedInput
+                  label='Password'
+                  id='auth-register-password'
+                  type={isPasswordShown ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  endAdornment={
                     <InputAdornment position='end'>
                       <IconButton
-                        size='small'
                         edge='end'
                         onClick={handleClickShowPassword}
                         onMouseDown={e => e.preventDefault()}
+                        aria-label='toggle password visibility'
                       >
                         <i className={isPasswordShown ? 'ri-eye-off-line' : 'ri-eye-line'} />
                       </IconButton>
                     </InputAdornment>
-                  )
-                }}
-              />
-              <FormControlLabel
-                control={<Checkbox />}
-                name='terms'
-                value={formData.terms}
-                required
-                label={
-                  <>
-                    <span>I agree to </span>
-                    <Link className='text-primary' href='/terms' onClick={e => e.preventDefault()} target='_blank'>
-                      privacy policy & terms
-                    </Link>
-                  </>
-                }
-              />
+                  }
+                />
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel htmlFor='auth-register-password-confirm'>Confirm Password</InputLabel>
+                <OutlinedInput
+                  label='Confirm Password'
+                  id='auth-register-password-confirm'
+                  type={isPasswordConfirmShown ? 'text' : 'password'}
+                  value={passwordConfirm}
+                  onChange={e => setPasswordConfirm(e.target.value)}
+                  endAdornment={
+                    <InputAdornment position='end'>
+                      <IconButton
+                        edge='end'
+                        onClick={handleClickShowPasswordConfirm}
+                        onMouseDown={e => e.preventDefault()}
+                        aria-label='toggle password visibility'
+                      >
+                        <i className={isPasswordConfirmShown ? 'ri-eye-off-line' : 'ri-eye-line'} />
+                      </IconButton>
+                    </InputAdornment>
+                  }
+                />
+              </FormControl>
+              {error && <FormHelperText error>{error}</FormHelperText>}
               <Button fullWidth variant='contained' type='submit'>
-                Sign Up
+                Sign up
               </Button>
-              {message && <Typography color='error'>{message}</Typography>}
               <div className='flex justify-center items-center flex-wrap gap-2'>
                 <Typography>Already have an account?</Typography>
                 <Typography component={Link} href='/login' color='primary'>

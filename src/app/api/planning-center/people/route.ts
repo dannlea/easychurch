@@ -4,6 +4,9 @@ import { cookies } from 'next/headers'
 
 import axios from 'axios'
 
+// Mark this route as dynamic to fix the deployment error
+export const dynamic = 'force-dynamic'
+
 const BASE_URL = 'https://api.planningcenteronline.com/people/v2'
 
 let progress = 0 // Track progress
