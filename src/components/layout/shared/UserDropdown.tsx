@@ -67,13 +67,16 @@ const UserDropdown = () => {
           src = `/${src}`
         }
 
-        // Add the backend server URL
-        const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER
+        // Get backend URL from environment variable with fallback for development
+        const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER || 'http://localhost:3001'
 
         src = `${backendUrl}${src}`
       }
 
-      console.log('Setting profile picture path:', src)
+      // Production code shouldn't log sensitive information
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Setting profile picture path:', src)
+      }
 
       // Temporarily create an image to test loading
       const img = new Image()
@@ -81,11 +84,17 @@ const UserDropdown = () => {
       img.onload = () => {
         setImgSrc(src)
         setImgError(false)
-        console.log('Profile image successfully loaded:', src)
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Profile image successfully loaded')
+        }
       }
 
       img.onerror = () => {
-        console.error('Failed to preload profile picture:', src)
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to preload profile picture')
+        }
+
         setImgError(true)
       }
 
@@ -96,7 +105,10 @@ const UserDropdown = () => {
   }, [user?.profilePicture])
 
   const handleImageError = () => {
-    console.error('Failed to load profile picture:', imgSrc)
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Failed to load profile picture')
+    }
+
     setImgError(true)
   }
 
@@ -125,8 +137,11 @@ const UserDropdown = () => {
     }
   }, [router])
 
+  // Only log in development environment
   useEffect(() => {
-    console.log('UserDropdown rendered with user:', user)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('UserDropdown rendered with user')
+    }
   }, [user])
 
   // States
