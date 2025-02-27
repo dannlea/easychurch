@@ -15,9 +15,11 @@ dotenv.config()
 const app = express()
 
 app.use(express.json())
+
+// Update CORS to accept requests from your production domain
 app.use(
   cors({
-    origin: 'http://localhost:3000',
+    origin: ['http://localhost:3000', 'https://easychurch.onrender.com'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
   })
@@ -25,16 +27,22 @@ app.use(
 
 app.options('*', cors())
 
-app.use('/auth', authRoutes)
-app.use('/users', userRoutes)
-app.use('/org', orgRoutes)
+// Mount all API routes under /ec-api prefix
+const apiRouter = express.Router()
+
+apiRouter.use('/auth', authRoutes)
+apiRouter.use('/users', userRoutes)
+apiRouter.use('/org', orgRoutes)
+
+// Apply the router to the /ec-api path
+app.use('/backend', apiRouter)
 
 // Convert import.meta.url to __dirname
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Serve static files from the 'assets' directory
-app.use('/assets', express.static(path.join(__dirname, 'assets')))
+app.use('/backend/assets', express.static(path.join(__dirname, 'assets')))
 
 const pool = mariadb.createPool({
   host: process.env.DB_HOST,
@@ -46,6 +54,16 @@ const pool = mariadb.createPool({
 })
 
 const PORT = process.env.PORT || 3001
+
+// Root endpoint
+app.get('/backend', (req, res) => {
+  res.send('API is running')
+})
+
+// This is critical - add a catch-all route handler for the /ec-api path
+app.all('/backend/*', (req, res) => {
+  res.status(404).json({ message: 'API endpoint not found' })
+})
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
