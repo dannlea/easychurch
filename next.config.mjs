@@ -5,7 +5,11 @@ const nextConfig = {
 
   // Enable image optimization and configure domains for remote images
   images: {
-    domains: ['localhost', new URL(process.env.NEXT_PUBLIC_LOCAL_SERVER || 'http://localhost:3001').hostname],
+    domains: [
+      'localhost',
+      'easychurch.onrender.com',
+      new URL(process.env.NEXT_PUBLIC_LOCAL_SERVER || 'http://localhost:3001').hostname
+    ],
 
     // Optimize image sizes
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],

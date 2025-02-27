@@ -33,8 +33,6 @@ import Illustrations from '@components/Illustrations'
 // Hook Imports
 import { useImageVariant } from '@core/hooks/useImageVariant'
 
-NEXT_PUBLIC_LOCAL_SERVER: process.env.LOCAL_SERVER
-
 const Register = ({ mode }: { mode: Mode }) => {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
