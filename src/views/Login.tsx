@@ -86,8 +86,13 @@ const Login = ({ mode }: { mode: Mode }) => {
 
       console.log('Raw response text:', responseText)
 
-      if (response.ok) {
-        const { token } = JSON.parse(responseText)
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}: ${responseText}`)
+      }
+
+      try {
+        const data = JSON.parse(responseText)
+        const { token } = data
 
         console.log('Token received:', token)
         localStorage.setItem('token', token)
@@ -103,15 +108,14 @@ const Login = ({ mode }: { mode: Mode }) => {
 
         // Use the router hook to navigate to the home page
         router.push('/')
-      } else {
-        const errorData = JSON.parse(responseText)
-
-        console.error('Login failed:', errorData)
-        setError(errorData.message || 'Login failed')
+      } catch (parseError) {
+        console.error('Failed to parse response as JSON:', parseError)
+        console.error('Raw response was:', responseText)
+        setError('Server returned invalid data. Please try again later.')
       }
     } catch (error) {
       console.error('Error during login:', error)
-      setError('An error occurred. Please try again.')
+      setError(error instanceof Error ? error.message : 'An error occurred. Please try again.')
     }
   }
 
