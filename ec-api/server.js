@@ -30,9 +30,9 @@ app.options('*', cors())
 // Mount all API routes under /ec-api prefix
 const apiRouter = express.Router()
 
-apiRouter.use('/auth', authRoutes)
-apiRouter.use('/users', userRoutes)
-apiRouter.use('/org', orgRoutes)
+apiRouter.use('/backend/auth', authRoutes)
+apiRouter.use('/backend/users', userRoutes)
+apiRouter.use('/backend/org', orgRoutes)
 
 // Apply the router to the /ec-api path
 app.use('/backend', apiRouter)
