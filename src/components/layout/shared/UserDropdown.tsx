@@ -55,20 +55,35 @@ const UserDropdown = () => {
       // Handle both relative and absolute paths
       let src = user.profilePicture
 
-      // If it's an absolute URL, use it as is
-      if (src.startsWith('http')) {
-        // No changes needed for absolute URLs
-      }
+      // Fix profile picture path if needed
+      if (src && !src.startsWith('data:') && !src.startsWith('http')) {
+        // Get backend URL from environment variable with fallback for development
+        const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER
+          ? process.env.NEXT_PUBLIC_LOCAL_SERVER.replace(/\/$/, '')
+          : 'http://localhost:3001'
 
-      // If it starts with /, it's a relative path to the backend
-      else {
-        // Make sure it starts with /
-        if (!src.startsWith('/')) {
-          src = `/${src}`
+        // Log the backend URL for debugging
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Backend URL for UserDropdown:', backendUrl)
         }
 
-        // Get backend URL from environment variable with fallback for development
-        const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER || 'http://localhost:3001'
+        // Remove any leading slashes to start fresh
+        src = src.replace(/^\/+/, '')
+
+        // If it's an assets path, make sure it has the correct format
+        if (src.startsWith('assets/')) {
+          src = `api/assets/${src.substring('assets/'.length)}`
+        } else if (!src.startsWith('api/')) {
+          src = `api/${src}`
+        }
+
+        // Now add a single leading slash
+        src = `/${src}`
+
+        // Log the final path for debugging
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Final profile picture path:', `${backendUrl}${src}`)
+        }
 
         src = `${backendUrl}${src}`
       }

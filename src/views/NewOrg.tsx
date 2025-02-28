@@ -137,7 +137,7 @@ const NewOrg = ({ mode }: { mode: Mode }) => {
               />
               <TextField
                 fullWidth
-                label='Address'
+                label='Church Address'
                 name='address'
                 value={formData.address}
                 onChange={handleChange}

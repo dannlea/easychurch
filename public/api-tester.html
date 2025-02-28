@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Next.js API Tester</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      h1,
+      h2 {
+        color: #333;
+      }
+      .endpoint {
+        margin-bottom: 20px;
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 5px;
+      }
+      button {
+        background-color: #4caf50;
+        border: none;
+        color: white;
+        padding: 10px 15px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+      pre {
+        background-color: #f5f5f5;
+        padding: 10px;
+        border-radius: 5px;
+        overflow-x: auto;
+      }
+      input[type='file'],
+      input[type='text'] {
+        margin-bottom: 10px;
+        padding: 8px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .response {
+        margin-top: 10px;
+      }
+      .error {
+        background-color: #ffebee;
+        border: 1px solid #ffcdd2;
+        padding: 10px;
+        border-radius: 5px;
+        color: #c62828;
+      }
+      .error pre {
+        background-color: #ffcdd2;
+        margin-top: 10px;
+      }
+      .error-details {
+        margin-top: 10px;
+        font-size: 14px;
+      }
+      .error-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Next.js API Tester</h1>
+    <p>Use this page to test your Next.js API endpoints</p>
+
+    <div class="endpoint">
+      <h2>Health Check</h2>
+      <button onclick="testEndpoint('/api/health', 'healthResponse')">Test Health</button>
+      <div id="healthResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+      <h2>Database Test</h2>
+      <button onclick="testEndpoint('/api/test/db', 'dbResponse')">Test Database</button>
+      <div id="dbResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+      <h2>Create Test User</h2>
+      <button onclick="testEndpoint('/api/test/user', 'userResponse', 'POST')">Create User</button>
+      <div id="userResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+      <h2>Login</h2>
+      <div>
+        <input type="text" id="email" placeholder="Email" />
+        <input type="text" id="password" placeholder="Password" />
+        <button onclick="login()">Login</button>
+      </div>
+      <div id="loginResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+      <h2>Test Authentication</h2>
+      <button onclick="testAuthEndpoint('/api/test/auth', 'authResponse')">Test Auth</button>
+      <div id="authResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+      <h2>File Upload Test</h2>
+      <div>
+        <input type="file" id="fileUpload" />
+        <button onclick="uploadFile()">Upload</button>
+      </div>
+      <div id="uploadResponse" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+      <h2>Endpoints</h2>
+      <button onclick="testEndpoint('/api/test/endpoints', 'endpointsResponse')">Public</button>
+      <button onclick="testAuthEndpoint('/api/test/endpoints', 'secureEndpointsResponse', 'POST')">Secure</button>
+      <div id="endpointsResponse" class="response"></div>
+      <div id="secureEndpointsResponse" class="response"></div>
+    </div>
+
+    <script>
+      // Token storage
+      let authToken = localStorage.getItem('authToken') || null
+
+      // Helper function to render error details
+      function renderErrorDetails(error, response) {
+        let errorHTML = `<div class="error">
+          <div class="error-title">Error: ${error.message || 'Unknown error'}</div>`
+
+        // Add response details if available
+        if (response) {
+          errorHTML += `<div class="error-details">
+            <div>Status: ${response.status} ${response.statusText}</div>
+            <div>URL: ${response.url}</div>
+          </div>`
+
+          // If we have response text, show it
+          if (error.responseText) {
+            errorHTML += `<div class="error-details">
+              <div class="error-title">Response Text:</div>
+              <pre>${error.responseText}</pre>
+            </div>`
+          }
+        }
+
+        // Add stack trace if available
+        if (error.stack) {
+          errorHTML += `<details class="error-details">
+            <summary>Stack Trace</summary>
+            <pre>${error.stack}</pre>
+          </details>`
+        }
+
+        errorHTML += `</div>`
+        return errorHTML
+      }
+
+      // Enhanced fetch with better error handling
+      async function enhancedFetch(url, options = {}) {
+        console.log(`[DEBUG] Request to ${url}:`, { method: options.method || 'GET' })
+
+        try {
+          const response = await fetch(url, options)
+
+          console.log(`[DEBUG] Response from ${url}:`, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries([...response.headers.entries()]),
+            url: response.url
+          })
+
+          // Try to parse as JSON
+          try {
+            const data = await response.json()
+            return { success: true, data, response }
+          } catch (error) {
+            // JSON parsing failed, get the text content
+            const text = await response.clone().text()
+            console.error('JSON parsing error:', error)
+
+            const enhancedError = {
+              message: `JSON parsing error: ${error.message}`,
+              responseText: text,
+              status: response.status,
+              statusText: response.statusText
+            }
+
+            return {
+              success: false,
+              error: enhancedError,
+              response
+            }
+          }
+        } catch (error) {
+          console.error('Network error:', error)
+          return {
+            success: false,
+            error: {
+              message: `Network error: ${error.message}`,
+              stack: error.stack
+            }
+          }
+        }
+      }
+
+      // Test basic endpoint
+      async function testEndpoint(url, responseElementId, method = 'GET', body = null) {
+        const responseElement = document.getElementById(responseElementId)
+        responseElement.innerHTML = '<p>Loading...</p>'
+
+        try {
+          const options = { method }
+          if (body) {
+            options.headers = { 'Content-Type': 'application/json' }
+            options.body = JSON.stringify(body)
+          }
+
+          const result = await enhancedFetch(url, options)
+
+          if (result.success) {
+            responseElement.innerHTML = `
+              <p>Status: ${result.response.status} ${result.response.statusText}</p>
+              <pre>${JSON.stringify(result.data, null, 2)}</pre>
+            `
+            return result.data
+          } else {
+            responseElement.innerHTML = renderErrorDetails(result.error, result.response)
+            return null
+          }
+        } catch (error) {
+          console.error(`Error in testEndpoint (${url}):`, error)
+          responseElement.innerHTML = renderErrorDetails(error)
+          return null
+        }
+      }
+
+      // Test authenticated endpoint
+      async function testAuthEndpoint(url, responseElementId, method = 'GET', body = null) {
+        const responseElement = document.getElementById(responseElementId)
+
+        if (!authToken) {
+          responseElement.innerHTML = '<p>Not authenticated. Please login first.</p>'
+          return
+        }
+
+        responseElement.innerHTML = '<p>Loading...</p>'
+
+        try {
+          const options = {
+            method,
+            headers: {
+              Authorization: `Bearer ${authToken}`
+            }
+          }
+
+          if (body) {
+            options.headers['Content-Type'] = 'application/json'
+            options.body = JSON.stringify(body)
+          }
+
+          const result = await enhancedFetch(url, options)
+
+          if (result.success) {
+            responseElement.innerHTML = `
+              <p>Status: ${result.response.status} ${result.response.statusText}</p>
+              <pre>${JSON.stringify(result.data, null, 2)}</pre>
+            `
+            return result.data
+          } else {
+            responseElement.innerHTML = renderErrorDetails(result.error, result.response)
+            return null
+          }
+        } catch (error) {
+          console.error(`Error in testAuthEndpoint (${url}):`, error)
+          responseElement.innerHTML = renderErrorDetails(error)
+          return null
+        }
+      }
+
+      // Login function
+      async function login() {
+        const email = document.getElementById('email').value
+        const password = document.getElementById('password').value
+
+        if (!email || !password) {
+          document.getElementById('loginResponse').innerHTML = '<p>Please enter email and password</p>'
+          return
+        }
+
+        const data = await testEndpoint('/api/auth/login', 'loginResponse', 'POST', { email, password })
+
+        if (data && data.token) {
+          authToken = data.token
+          localStorage.setItem('authToken', authToken)
+          document.getElementById('loginResponse').innerHTML += '<p>Token saved to localStorage</p>'
+        }
+      }
+
+      // File upload function
+      async function uploadFile() {
+        const fileInput = document.getElementById('fileUpload')
+        const responseElement = document.getElementById('uploadResponse')
+
+        if (!fileInput.files.length) {
+          responseElement.innerHTML = '<p>Please select a file</p>'
+          return
+        }
+
+        if (!authToken) {
+          responseElement.innerHTML = '<p>Not authenticated. Please login first.</p>'
+          return
+        }
+
+        responseElement.innerHTML = '<p>Uploading...</p>'
+
+        try {
+          const formData = new FormData()
+          formData.append('file', fileInput.files[0])
+
+          const response = await fetch('/api/test/upload', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${authToken}`
+            },
+            body: formData
+          })
+
+          // Enhanced error handling for file uploads
+          try {
+            const data = await response.json()
+            responseElement.innerHTML = `
+              <p>Status: ${response.status} ${response.statusText}</p>
+              <pre>${JSON.stringify(data, null, 2)}</pre>
+            `
+          } catch (error) {
+            // Handle JSON parsing errors
+            const text = await response.text()
+            console.error('JSON parsing error during file upload:', error)
+
+            responseElement.innerHTML = renderErrorDetails(
+              {
+                message: `JSON parsing error: ${error.message}`,
+                responseText: text
+              },
+              response
+            )
+          }
+        } catch (error) {
+          console.error('Network error during file upload:', error)
+          responseElement.innerHTML = renderErrorDetails(error)
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Debug</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      button {
+        padding: 10px;
+        margin: 10px 0;
+      }
+      pre {
+        background-color: #f5f5f5;
+        padding: 10px;
+        white-space: pre-wrap;
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      h2 {
+        margin-top: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>API Debug</h1>
+    <p>Use this page to test and debug your Next.js API endpoints</p>
+
+    <div class="test-section">
+      <h2>API Root Test</h2>
+      <button onclick="testEndpoint('/api', 'apiRootResponse')">Test API Root</button>
+      <div id="apiRootResponse"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Text Response Test</h2>
+      <button onclick="testEndpoint('/api/debug', 'textResponse', 'text')">Test Plain Text</button>
+      <div id="textResponse"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Health Check Test</h2>
+      <button onclick="testEndpoint('/api/health', 'healthResponse')">Test Health</button>
+      <div id="healthResponse"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Database Test</h2>
+      <button onclick="testEndpoint('/api/test/db', 'dbResponse')">Test Database</button>
+      <div id="dbResponse"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Environment Config Test</h2>
+      <button onclick="testEndpoint('/api/test/config', 'configResponse')">Test Config</button>
+      <div id="configResponse"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Raw Response Inspection</h2>
+      <input
+        type="text"
+        id="customEndpoint"
+        value="/api/health"
+        style="width: 300px; padding: 8px; margin-right: 10px"
+      />
+      <button onclick="testCustomEndpoint()">Test Custom Endpoint</button>
+      <div id="rawResponse"></div>
+    </div>
+
+    <script>
+      // Test endpoint with flexible response handling
+      async function testEndpoint(url, responseElementId, responseType = 'json') {
+        document.getElementById(responseElementId).innerHTML = 'Loading...'
+
+        try {
+          const response = await fetch(url)
+          let data
+
+          if (responseType === 'text') {
+            data = await response.text()
+
+            document.getElementById(responseElementId).innerHTML = `
+              <p>Status: ${response.status} ${response.statusText}</p>
+              <p>Response:</p>
+              <pre>${data}</pre>
+              <p>Headers:</p>
+              <pre>${JSON.stringify(Object.fromEntries([...response.headers]), null, 2)}</pre>
+            `
+          } else {
+            // Store a clone of the response for potential error handling
+            const responseClone = response.clone()
+
+            try {
+              data = await response.json()
+
+              document.getElementById(responseElementId).innerHTML = `
+                <p>Status: ${response.status} ${response.statusText}</p>
+                <p>Response:</p>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+              `
+            } catch (parseError) {
+              // If JSON parsing fails, get the raw text from the clone
+              const rawText = await responseClone.text()
+
+              document.getElementById(responseElementId).innerHTML = `
+                <p>Status: ${response.status} ${response.statusText}</p>
+                <p>JSON Parse Error: ${parseError.message}</p>
+                <p>Raw Response:</p>
+                <pre>${rawText}</pre>
+              `
+            }
+          }
+        } catch (error) {
+          document.getElementById(responseElementId).innerHTML = `
+            <p>Network Error: ${error.message}</p>
+            <pre>${error.stack}</pre>
+          `
+        }
+      }
+
+      // Test a custom endpoint specified by the user
+      async function testCustomEndpoint() {
+        const endpoint = document.getElementById('customEndpoint').value
+        document.getElementById('rawResponse').innerHTML = 'Loading...'
+
+        try {
+          const response = await fetch(endpoint)
+
+          // Log the full response details
+          const responseDetails = {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries([...response.headers]),
+            type: response.type,
+            url: response.url
+          }
+
+          // Clone the response before any body reading operations
+          const responseForText = response.clone()
+          const responseForJson = response.clone()
+
+          // Try to parse as JSON
+          let data
+          let parseError = null
+
+          try {
+            data = await responseForJson.json()
+          } catch (e) {
+            parseError = e
+            // Try to get text instead from the text clone
+            data = await responseForText.text()
+          }
+
+          document.getElementById('rawResponse').innerHTML = `
+            <p>Response Details:</p>
+            <pre>${JSON.stringify(responseDetails, null, 2)}</pre>
+            <p>Response Data:</p>
+            <pre>${parseError ? 'JSON Parse Error: ' + parseError.message + '\nRaw Text: ' + data : JSON.stringify(data, null, 2)}</pre>
+          `
+        } catch (error) {
+          document.getElementById('rawResponse').innerHTML = `
+            <p>Network Error:</p>
+            <pre>${error.toString()}\n${error.stack}</pre>
+          `
+        }
+      }
+    </script>
+  </body>
+</html>

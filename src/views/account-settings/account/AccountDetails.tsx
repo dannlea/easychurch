@@ -59,28 +59,104 @@ const AccountDetails = () => {
   // Fetch user data from API
   useEffect(() => {
     const fetchUserData = async () => {
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_SERVER}/users/2`)
-        const [data] = await response.json()
+      let userData = null
 
-        console.log('Fetched user data:', data)
-        setFormData({
-          firstName: data.first_name || '',
-          lastName: data.last_name || '',
-          email: data.email || '',
-          organization: data.organization_name || '',
-          phoneNumber: data.phone_number || '',
-          address: data.address || '',
-          state: data.state || '',
-          zipCode: data.zip_code || '',
-          country: data.country || '',
-          language: data.language || '',
-          timezone: data.time_zone || 'gmt-05', // Default value
-          currency: data.currency || 'usd' // Default value
+      try {
+        const token = localStorage.getItem('token')
+
+        // Get backend URL without trailing slash
+        const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER
+          ? process.env.NEXT_PUBLIC_LOCAL_SERVER.replace(/\/$/, '')
+          : ''
+
+        console.log('Using backend URL:', backendUrl)
+
+        // Try the normal endpoint first
+        let response = await fetch(`${backendUrl}/api/users/2`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         })
 
-        // Set the avatar image source
-        setImgSrc(`${process.env.NEXT_PUBLIC_LOCAL_SERVER}${data.profile_picture || '/images/placeholder.png'}`)
+        // If the regular endpoint fails, try the simplified one
+        if (!response.ok) {
+          console.log(`Main API endpoint failed with status ${response.status}. Trying simplified endpoint...`)
+          response = await fetch(`${backendUrl}/api/users-simple/2`)
+
+          if (!response.ok) {
+            throw new Error(`Both API endpoints failed. Last error: ${response.status} ${response.statusText}`)
+          }
+        }
+
+        const data = await response.json()
+
+        // Check if data is an array or single object and handle accordingly
+        userData = Array.isArray(data) ? data[0] : data
+
+        if (!userData) {
+          console.error('No user data returned from API')
+
+          return
+        }
+
+        console.log('Fetched user data:', userData)
+        setFormData({
+          firstName: userData.first_name || '',
+          lastName: userData.last_name || '',
+          email: userData.email || '',
+          organization: userData.organization_name || '',
+          phoneNumber: userData.phone_number || '',
+          address: userData.address || '',
+          state: userData.state || '',
+          zipCode: userData.zip_code || '',
+          country: userData.country || '',
+          language: userData.language || '',
+          timezone: userData.time_zone || 'gmt-05', // Default value
+          currency: userData.currency || 'usd' // Default value
+        })
+
+        // Set the avatar image source with the correct API path
+        const profilePicture = userData.profile_picture || '/images/placeholder.png'
+
+        // Ensure the path is properly formatted for the API
+        let picturePath = profilePicture
+
+        // Only process API paths, not local images
+        if (!picturePath.startsWith('/images/')) {
+          // Get backend URL without trailing slash
+          const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER
+            ? process.env.NEXT_PUBLIC_LOCAL_SERVER.replace(/\/$/, '')
+            : ''
+
+          console.log('Backend URL for image:', backendUrl)
+
+          // Remove any leading slashes
+          picturePath = picturePath.replace(/^\/+/, '')
+
+          // Format correctly - always prepend /api if it's not already there
+          if (picturePath.startsWith('assets/')) {
+            picturePath = `api/assets/${picturePath.substring('assets/'.length)}`
+          } else if (!picturePath.startsWith('api/')) {
+            picturePath = `api/${picturePath}`
+          }
+
+          // Add a single leading slash
+          picturePath = `/${picturePath}`
+
+          // For absolute URLs, we'll use the backendUrl
+          // For local placeholder images, we'll use a relative path
+          if (backendUrl) {
+            console.log('Profile picture path (absolute):', `${backendUrl}${picturePath}`)
+            setImgSrc(`${backendUrl}${picturePath}`)
+          } else {
+            console.log('Profile picture path (relative):', picturePath)
+            setImgSrc(picturePath)
+          }
+        } else {
+          // For local images like /images/placeholder.png
+          console.log('Using local image:', picturePath)
+          setImgSrc(picturePath)
+        }
       } catch (error) {
         console.error('Error fetching user data:', error)
       }
