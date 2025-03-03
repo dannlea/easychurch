@@ -71,7 +71,10 @@ const VerticalMenu = ({ scrollMenu }: { scrollMenu: (container: any, isPerfectSc
           </MenuItem>
         </MenuSection>
         <MenuSection label='Apps & Pages'>
-          <MenuItem href={user ? '/account-settings' : '/login'} icon={<i className='ri-user-settings-line' />}>
+          <MenuItem
+            href={user ? `/account-settings?id=${user.id}` : '/login'}
+            icon={<i className='ri-user-settings-line' />}
+          >
             Account Settings{user ? ` (${user.name})` : ''}
           </MenuItem>
           <MenuItem href='/login' target='_blank'>

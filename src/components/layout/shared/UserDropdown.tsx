@@ -263,7 +263,7 @@ const UserDropdown = () => {
                   <Divider className='mlb-1' />
                   <MenuItem className='gap-3' onClick={e => handleDropdownClose(e)}>
                     <i className='ri-user-3-line' />
-                    <Link href='/account-settings'>
+                    <Link href={user ? `/account-settings?id=${user.id}` : '/login'}>
                       <Typography color='text.primary'>Account Settings</Typography>
                     </Link>
                   </MenuItem>

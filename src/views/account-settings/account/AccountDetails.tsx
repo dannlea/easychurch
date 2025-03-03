@@ -4,6 +4,9 @@
 import { useState, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
 
+// Next Imports
+import { useSearchParams } from 'next/navigation'
+
 // MUI Imports
 import Grid from '@mui/material/Grid'
 import Card from '@mui/material/Card'
@@ -64,8 +67,9 @@ const AccountDetails = () => {
   const [imgSrc, setImgSrc] = useState<string>('/images/placeholder.png')
   const [language, setLanguage] = useState<string[]>(['English'])
 
-  // Get user context
+  // Get user context and search params
   const { user } = useUser()
+  const searchParams = useSearchParams()
 
   // Add loading and error states
   const [isLoading, setIsLoading] = useState<boolean>(true)
@@ -77,9 +81,13 @@ const AccountDetails = () => {
       setIsLoading(true)
       setError(null)
 
-      // If no user in context, exit early
-      if (!user) {
-        setError('Please log in to view your account details')
+      // Get user ID from URL params if available, otherwise use user context
+      const urlUserId = searchParams.get('id')
+      const userId = urlUserId || (user?.id ? String(user.id) : null)
+
+      // If no user ID found, exit early
+      if (!userId) {
+        setError('Please log in to view account details')
         setIsLoading(false)
 
         return
@@ -90,10 +98,10 @@ const AccountDetails = () => {
       try {
         const token = localStorage.getItem('token')
 
-        console.log(`Getting user data for ID: ${user.id}`)
+        console.log(`Getting user data for ID: ${userId}`)
 
         // Try the normal endpoint first
-        let response = await fetch(buildApiUrl(`users/${user.id}`), {
+        let response = await fetch(buildApiUrl(`users/${userId}`), {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -102,7 +110,7 @@ const AccountDetails = () => {
         // If the regular endpoint fails, try the simplified one
         if (!response.ok) {
           console.log(`Main API endpoint failed with status ${response.status}. Trying simplified endpoint...`)
-          response = await fetch(buildApiUrl(`users-simple/${user.id}`))
+          response = await fetch(buildApiUrl(`users-simple/${userId}`))
 
           if (!response.ok) {
             throw new Error(`Both API endpoints failed. Last error: ${response.status} ${response.statusText}`)
@@ -150,7 +158,7 @@ const AccountDetails = () => {
     }
 
     fetchUserData()
-  }, [user]) // Add user to dependency array
+  }, [user, searchParams]) // Add searchParams to dependency array
 
   const handleDelete = (value: string) => {
     setLanguage(current => current.filter(item => item !== value))
@@ -195,8 +203,12 @@ const AccountDetails = () => {
       formDataToSend.append('avatar', files[0])
 
       try {
+        // Get user ID from URL params if available, otherwise use user context
+        const urlUserId = searchParams.get('id')
+        const userId = urlUserId || (user?.id ? String(user.id) : null)
+
         // Send the file and form data to the server
-        const userApiUrl = user ? buildApiUrl(`users/${user.id}`) : buildApiUrl('users/me')
+        const userApiUrl = userId ? buildApiUrl(`users/${userId}`) : buildApiUrl('users/me')
 
         const response = await fetch(userApiUrl, {
           method: 'PUT',
@@ -222,9 +234,13 @@ const AccountDetails = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Ensure user exists in context
-    if (!user) {
-      console.error('Cannot update user profile: No user in context')
+    // Get user ID from URL params if available, otherwise use user context
+    const urlUserId = searchParams.get('id')
+    const userId = urlUserId || (user?.id ? String(user.id) : null)
+
+    // Ensure we have a user ID
+    if (!userId) {
+      console.error('Cannot update user profile: No user ID available')
 
       return
     }
@@ -247,7 +263,7 @@ const AccountDetails = () => {
     }
 
     try {
-      const userApiUrl = buildApiUrl(`users/${user.id}`)
+      const userApiUrl = buildApiUrl(`users/${userId}`)
 
       const response = await fetch(userApiUrl, {
         method: 'PUT',
