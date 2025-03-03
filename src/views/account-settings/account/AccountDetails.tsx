@@ -16,10 +16,15 @@ import InputLabel from '@mui/material/InputLabel'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import Chip from '@mui/material/Chip'
+import CircularProgress from '@mui/material/CircularProgress'
+import Alert from '@mui/material/Alert'
 import type { SelectChangeEvent } from '@mui/material/Select'
 
 // Import utility functions
 import { buildApiUrl } from '@/core/utils/apiUtils'
+
+// Import user context
+import { useUser } from '@core/contexts/UserContext'
 
 type Data = {
   firstName?: string
@@ -55,22 +60,40 @@ const AccountDetails = () => {
     currency: 'usd' // Default value
   })
 
-  const [fileInput, setFileInput] = useState<string>('')
+  const [fileInput, setFileInput] = useState<File | null>(null)
   const [imgSrc, setImgSrc] = useState<string>('/images/placeholder.png')
   const [language, setLanguage] = useState<string[]>(['English'])
+
+  // Get user context
+  const { user } = useUser()
+
+  // Add loading and error states
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Fetch user data from API
   useEffect(() => {
     const fetchUserData = async () => {
+      setIsLoading(true)
+      setError(null)
+
+      // If no user in context, exit early
+      if (!user) {
+        setError('Please log in to view your account details')
+        setIsLoading(false)
+
+        return
+      }
+
       let userData = null
 
       try {
         const token = localStorage.getItem('token')
 
-        console.log('Getting user data...')
+        console.log(`Getting user data for ID: ${user.id}`)
 
         // Try the normal endpoint first
-        let response = await fetch(buildApiUrl('users/2'), {
+        let response = await fetch(buildApiUrl(`users/${user.id}`), {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -79,7 +102,7 @@ const AccountDetails = () => {
         // If the regular endpoint fails, try the simplified one
         if (!response.ok) {
           console.log(`Main API endpoint failed with status ${response.status}. Trying simplified endpoint...`)
-          response = await fetch(buildApiUrl('users-simple/2'))
+          response = await fetch(buildApiUrl(`users-simple/${user.id}`))
 
           if (!response.ok) {
             throw new Error(`Both API endpoints failed. Last error: ${response.status} ${response.statusText}`)
@@ -92,9 +115,7 @@ const AccountDetails = () => {
         userData = Array.isArray(data) ? data[0] : data
 
         if (!userData) {
-          console.error('No user data returned from API')
-
-          return
+          throw new Error('No user data returned from API')
         }
 
         console.log('Fetched user data:', userData)
@@ -113,55 +134,23 @@ const AccountDetails = () => {
           currency: userData.currency || 'usd' // Default value
         })
 
-        // Set the avatar image source with the correct API path
-        const profilePicture = userData.profile_picture || '/images/placeholder.png'
+        // Set the avatar image source if available
+        if (userData.profile_picture) {
+          const picturePath = userData.profile_picture
 
-        // Ensure the path is properly formatted for the API
-        let picturePath = profilePicture
-
-        // Only process API paths, not local images
-        if (!picturePath.startsWith('/images/')) {
-          // Get backend URL without trailing slash
-          const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER
-            ? process.env.NEXT_PUBLIC_LOCAL_SERVER.replace(/\/$/, '')
-            : ''
-
-          console.log('Backend URL for image:', backendUrl)
-
-          // Remove any leading slashes
-          picturePath = picturePath.replace(/^\/+/, '')
-
-          // Format correctly - always prepend /api if it's not already there
-          if (picturePath.startsWith('assets/')) {
-            picturePath = `api/assets/${picturePath.substring('assets/'.length)}`
-          } else if (!picturePath.startsWith('api/')) {
-            picturePath = `api/${picturePath}`
-          }
-
-          // Add a single leading slash
-          picturePath = `/${picturePath}`
-
-          // For absolute URLs, we'll use the backendUrl
-          // For local placeholder images, we'll use a relative path
-          if (backendUrl) {
-            console.log('Profile picture path (absolute):', `${backendUrl}${picturePath}`)
-            setImgSrc(`${backendUrl}${picturePath}`)
-          } else {
-            console.log('Profile picture path (relative):', picturePath)
-            setImgSrc(picturePath)
-          }
-        } else {
-          // For local images like /images/placeholder.png
-          console.log('Using local image:', picturePath)
           setImgSrc(picturePath)
         }
+
+        setIsLoading(false)
       } catch (error) {
         console.error('Error fetching user data:', error)
+        setError('Failed to load your account details. Please try again later.')
+        setIsLoading(false)
       }
     }
 
     fetchUserData()
-  }, [])
+  }, [user]) // Add user to dependency array
 
   const handleDelete = (value: string) => {
     setLanguage(current => current.filter(item => item !== value))
@@ -179,12 +168,12 @@ const AccountDetails = () => {
     const reader = new FileReader()
     const { files } = file.target as HTMLInputElement
 
-    if (files && files.length !== 0) {
+    if (files && files.length > 0) {
       reader.onload = () => setImgSrc(reader.result as string)
       reader.readAsDataURL(files[0])
 
       if (reader.result !== null) {
-        setFileInput(reader.result as string)
+        setFileInput(files[0])
       }
 
       // Create a new FormData instance
@@ -207,7 +196,7 @@ const AccountDetails = () => {
 
       try {
         // Send the file and form data to the server
-        const userApiUrl = buildApiUrl('users/2')
+        const userApiUrl = user ? buildApiUrl(`users/${user.id}`) : buildApiUrl('users/me')
 
         const response = await fetch(userApiUrl, {
           method: 'PUT',
@@ -226,12 +215,19 @@ const AccountDetails = () => {
   }
 
   const handleFileInputReset = () => {
-    setFileInput('')
+    setFileInput(null)
     setImgSrc('/images/avatars/1.png')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Ensure user exists in context
+    if (!user) {
+      console.error('Cannot update user profile: No user in context')
+
+      return
+    }
 
     const formDataToSend = new FormData()
 
@@ -251,7 +247,7 @@ const AccountDetails = () => {
     }
 
     try {
-      const userApiUrl = buildApiUrl('users/2')
+      const userApiUrl = buildApiUrl(`users/${user.id}`)
 
       const response = await fetch(userApiUrl, {
         method: 'PUT',
@@ -270,191 +266,208 @@ const AccountDetails = () => {
 
   return (
     <>
-      <Card>
-        <CardContent className='mbe-5'>
-          <div className='flex max-sm:flex-col items-center gap-6'>
-            <img height={100} width={100} className='rounded' src={imgSrc} alt='Profile' />
-            <div className='flex flex-grow flex-col gap-4'>
-              <div className='flex flex-col sm:flex-row gap-4'>
-                <Button component='label' size='small' variant='contained' htmlFor='account-settings-upload-image'>
-                  Upload New Photo
-                  <input
-                    hidden
-                    type='file'
-                    value={fileInput}
-                    accept='image/png, image/jpeg'
-                    onChange={handleFileInputChange}
-                    id='account-settings-upload-image'
-                  />
-                </Button>
-                <Button size='small' variant='outlined' color='error' onClick={handleFileInputReset}>
-                  Reset
-                </Button>
+      {isLoading && (
+        <Card>
+          <CardContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+            <CircularProgress />
+          </CardContent>
+        </Card>
+      )}
+
+      {error && (
+        <Card>
+          <CardContent>
+            <Alert severity='error'>{error}</Alert>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && !error && (
+        <>
+          <Card>
+            <CardContent className='mbe-5'>
+              <div className='flex max-sm:flex-col items-center gap-6'>
+                <img height={100} width={100} className='rounded' src={imgSrc} alt='Profile' />
+                <div className='flex flex-grow flex-col gap-4'>
+                  <div className='flex flex-col sm:flex-row gap-4'>
+                    <Button component='label' size='small' variant='contained' htmlFor='account-settings-upload-image'>
+                      Upload New Photo
+                      <input
+                        hidden
+                        type='file'
+                        accept='image/png, image/jpeg'
+                        onChange={handleFileInputChange}
+                        id='account-settings-upload-image'
+                      />
+                    </Button>
+                    <Button size='small' variant='outlined' color='error' onClick={handleFileInputReset}>
+                      Reset
+                    </Button>
+                  </div>
+                  <Typography>Allowed JPG, GIF or PNG. Max size of 800K</Typography>
+                </div>
               </div>
-              <Typography>Allowed JPG, GIF or PNG. Max size of 800K</Typography>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <Card className='mt-5'>
-        <CardContent>
-          <form onSubmit={handleSubmit}>
-            <Grid container spacing={5}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label='First Name'
-                  value={formData?.firstName}
-                  placeholder='John'
-                  onChange={e => handleFormChange('firstName', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label='Last Name'
-                  value={formData?.lastName}
-                  placeholder='Doe'
-                  onChange={e => handleFormChange('lastName', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label='Email'
-                  value={formData?.email}
-                  placeholder='wacky-duck@ducks.com'
-                  onChange={e => handleFormChange('email', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  disabled
-                  fullWidth
-                  label='Organization'
-                  value={formData?.organization}
-                  placeholder='Your Organization Admin needs to set this'
-                  onChange={e => handleFormChange('organization', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label='Phone Number'
-                  value={formData?.phoneNumber}
-                  placeholder='+1 (234) 567-8901'
-                  onChange={e => handleFormChange('phoneNumber', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label='Address'
-                  value={formData?.address}
-                  placeholder='Address'
-                  onChange={e => handleFormChange('address', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label='Province/State'
-                  value={formData?.state}
-                  placeholder='New Brunswick'
-                  onChange={e => handleFormChange('state', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label='Postal Code'
-                  value={formData?.zipCode}
-                  placeholder='A1B 2C3'
-                  onChange={e => handleFormChange('zipCode', e.target.value)}
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label='Country'
-                  value={formData?.country}
-                  placeholder='Canada'
-                  onChange={e => handleFormChange('country', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Language</InputLabel>
-                  <Select
-                    multiple
-                    label='Language'
-                    value={language}
-                    onChange={handleChange}
-                    renderValue={selected => (
-                      <div className='flex flex-wrap gap-2'>
-                        {(selected as string[]).map(value => (
-                          <Chip
-                            key={value}
-                            clickable
-                            deleteIcon={
-                              <i className='ri-close-circle-fill' onMouseDown={event => event.stopPropagation()} />
-                            }
-                            size='small'
-                            label={value}
-                            onDelete={() => handleDelete(value)}
-                          />
+            </CardContent>
+          </Card>
+          <Card className='mt-5'>
+            <CardContent>
+              <form onSubmit={handleSubmit}>
+                <Grid container spacing={5}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label='First Name'
+                      placeholder='John'
+                      value={formData.firstName}
+                      onChange={e => handleFormChange('firstName', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label='Last Name'
+                      placeholder='Doe'
+                      value={formData.lastName}
+                      onChange={e => handleFormChange('lastName', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label='Email'
+                      placeholder='wacky-duck@ducks.com'
+                      value={formData.email}
+                      onChange={e => handleFormChange('email', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      disabled
+                      fullWidth
+                      label='Organization'
+                      placeholder='Your Organization Admin needs to set this'
+                      value={formData.organization}
+                      onChange={e => handleFormChange('organization', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label='Phone Number'
+                      placeholder='+1 (234) 567-8901'
+                      value={formData.phoneNumber}
+                      onChange={e => handleFormChange('phoneNumber', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label='Address'
+                      placeholder='Address'
+                      value={formData.address}
+                      onChange={e => handleFormChange('address', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label='Province/State'
+                      placeholder='New Brunswick'
+                      value={formData.state}
+                      onChange={e => handleFormChange('state', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label='Postal Code'
+                      placeholder='A1B 2C3'
+                      value={formData.zipCode}
+                      onChange={e => handleFormChange('zipCode', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label='Country'
+                      placeholder='Canada'
+                      value={formData.country}
+                      onChange={e => handleFormChange('country', e.target.value)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Language</InputLabel>
+                      <Select
+                        multiple
+                        label='Language'
+                        value={language}
+                        onChange={handleChange}
+                        renderValue={selected => (
+                          <div className='flex flex-wrap gap-2'>
+                            {(selected as string[]).map(value => (
+                              <Chip
+                                key={value}
+                                clickable
+                                deleteIcon={
+                                  <i className='ri-close-circle-fill' onMouseDown={event => event.stopPropagation()} />
+                                }
+                                size='small'
+                                label={value}
+                                onDelete={() => handleDelete(value)}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      >
+                        {languageData.map(name => (
+                          <MenuItem key={name} value={name}>
+                            {name}
+                          </MenuItem>
                         ))}
-                      </div>
-                    )}
-                  >
-                    {languageData.map(name => (
-                      <MenuItem key={name} value={name}>
-                        {name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>TimeZone</InputLabel>
-                  <Select
-                    label='TimeZone'
-                    value={formData?.timezone}
-                    onChange={e => handleFormChange('timezone', e.target.value)}
-                    MenuProps={{ PaperProps: { style: { maxHeight: 250 } } }}
-                  >
-                    <MenuItem value='gmt-12'>(GMT-12:00) International Date Line West</MenuItem>
-                    <MenuItem value='gmt-11'>(GMT-11:00) Midway Island, Samoa</MenuItem>
-                    <MenuItem value='gmt-10'>(GMT-10:00) Hawaii</MenuItem>
-                    <MenuItem value='gmt-09'>(GMT-09:00) Alaska</MenuItem>
-                    <MenuItem value='gmt-08'>(GMT-08:00) Pacific Time (US & Canada)</MenuItem>
-                    <MenuItem value='gmt-08-baja'>(GMT-08:00) Tijuana, Baja California</MenuItem>
-                    <MenuItem value='gmt-07'>(GMT-07:00) Chihuahua, La Paz, Mazatlan</MenuItem>
-                    <MenuItem value='gmt-07-mt'>(GMT-07:00) Mountain Time (US & Canada)</MenuItem>
-                    <MenuItem value='gmt-06'>(GMT-06:00) Central America</MenuItem>
-                    <MenuItem value='gmt-06-ct'>(GMT-06:00) Central Time (US & Canada)</MenuItem>
-                    <MenuItem value='gmt-06-mc'>(GMT-06:00) Guadalajara, Mexico City, Monterrey</MenuItem>
-                    <MenuItem value='gmt-06-sk'>(GMT-06:00) Saskatchewan</MenuItem>
-                    <MenuItem value='gmt-05'>(GMT-05:00) Bogota, Lima, Quito, Rio Branco</MenuItem>
-                    <MenuItem value='gmt-05-et'>(GMT-05:00) Eastern Time (US & Canada)</MenuItem>
-                    <MenuItem value='gmt-05-ind'>(GMT-05:00) Indiana (East)</MenuItem>
-                    <MenuItem value='gmt-04'>(GMT-04:00) Atlantic Time (Canada)</MenuItem>
-                    <MenuItem value='gmt-04-clp'>(GMT-04:00) Caracas, La Paz</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} className='flex gap-4 flex-wrap'>
-                <Button variant='contained' type='submit'>
-                  Save Changes
-                </Button>
-              </Grid>
-            </Grid>
-          </form>
-        </CardContent>
-      </Card>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>TimeZone</InputLabel>
+                      <Select
+                        label='TimeZone'
+                        value={formData.timezone}
+                        onChange={e => handleFormChange('timezone', e.target.value)}
+                        MenuProps={{ PaperProps: { style: { maxHeight: 250 } } }}
+                      >
+                        <MenuItem value='gmt-12'>(GMT-12:00) International Date Line West</MenuItem>
+                        <MenuItem value='gmt-11'>(GMT-11:00) Midway Island, Samoa</MenuItem>
+                        <MenuItem value='gmt-10'>(GMT-10:00) Hawaii</MenuItem>
+                        <MenuItem value='gmt-09'>(GMT-09:00) Alaska</MenuItem>
+                        <MenuItem value='gmt-08'>(GMT-08:00) Pacific Time (US & Canada)</MenuItem>
+                        <MenuItem value='gmt-08-baja'>(GMT-08:00) Tijuana, Baja California</MenuItem>
+                        <MenuItem value='gmt-07'>(GMT-07:00) Chihuahua, La Paz, Mazatlan</MenuItem>
+                        <MenuItem value='gmt-07-mt'>(GMT-07:00) Mountain Time (US & Canada)</MenuItem>
+                        <MenuItem value='gmt-06'>(GMT-06:00) Central America</MenuItem>
+                        <MenuItem value='gmt-06-ct'>(GMT-06:00) Central Time (US & Canada)</MenuItem>
+                        <MenuItem value='gmt-06-mc'>(GMT-06:00) Guadalajara, Mexico City, Monterrey</MenuItem>
+                        <MenuItem value='gmt-06-sk'>(GMT-06:00) Saskatchewan</MenuItem>
+                        <MenuItem value='gmt-05'>(GMT-05:00) Bogota, Lima, Quito, Rio Branco</MenuItem>
+                        <MenuItem value='gmt-05-et'>(GMT-05:00) Eastern Time (US & Canada)</MenuItem>
+                        <MenuItem value='gmt-05-ind'>(GMT-05:00) Indiana (East)</MenuItem>
+                        <MenuItem value='gmt-04'>(GMT-04:00) Atlantic Time (Canada)</MenuItem>
+                        <MenuItem value='gmt-04-clp'>(GMT-04:00) Caracas, La Paz</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button variant='contained' type='submit'>
+                      Save Changes
+                    </Button>
+                  </Grid>
+                </Grid>
+              </form>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </>
   )
 }
