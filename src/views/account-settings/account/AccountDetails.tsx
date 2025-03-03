@@ -124,9 +124,7 @@ const AccountDetails = () => {
           // If we get a 401 error, the token might be expired
           if (response.status === 401) {
             console.error('Authentication failed: 401 Unauthorized')
-            setError('Your session has expired. Please log in again or use test data option below.')
-
-            // Show a button to use test data instead
+            setError('Authentication failed (401). Please log in again to access your account details.')
             setIsLoading(false)
 
             return
@@ -332,54 +330,6 @@ const AccountDetails = () => {
     }
   }
 
-  const handleUseTestData = async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      // Get user ID from URL or default to 2
-      const urlUserId = searchParams.get('id') || '2'
-
-      // Fetch from the simplified endpoint directly
-      const response = await fetch(buildApiUrl(`users-simple/${urlUserId}`))
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch test data: ${response.status}`)
-      }
-
-      const userData = await response.json()
-
-      console.log('Using test data:', userData)
-
-      setFormData({
-        firstName: userData.first_name || '',
-        lastName: userData.last_name || '',
-        email: userData.email || '',
-        organization: userData.organization_name || '',
-        phoneNumber: userData.phone_number || '',
-        address: userData.address || '',
-        state: userData.state || '',
-        zipCode: userData.zip_code || '',
-        country: userData.country || '',
-        language: userData.language || '',
-        timezone: userData.time_zone || 'gmt-05',
-        currency: userData.currency || 'usd'
-      })
-
-      // Set image
-      if (userData.profile_picture) {
-        setImgSrc(userData.profile_picture)
-      }
-
-      toast.success('Loaded test data successfully')
-    } catch (err) {
-      console.error('Error loading test data:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load test data')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   return (
     <div className='flex flex-col gap-7'>
       <Toaster position='top-right' />
@@ -393,40 +343,30 @@ const AccountDetails = () => {
         </Card>
       )}
 
-      {/* Generic error state */}
-      {error && !error.includes('session has expired') && (
-        <Alert severity='error' sx={{ mb: 4 }}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Auth error with test data option */}
-      {error && error.includes('session has expired') && (
+      {/* Error state */}
+      {error && (
         <>
           <Alert severity='error' sx={{ mb: 4 }}>
             {error}
           </Alert>
-          <Card>
-            <CardContent>
-              <div className='flex flex-col gap-4 items-center'>
-                <Typography variant='h6'>Authentication Failed</Typography>
-                <Typography>You can use test data for development purposes or go back to login.</Typography>
-                <div className='flex gap-4'>
-                  <Button variant='contained' onClick={handleUseTestData}>
-                    Use Test Data
-                  </Button>
-                  <Button variant='outlined' onClick={() => router.push('/login')}>
-                    Back to Login
+          {error.includes('Authentication failed') && (
+            <Card>
+              <CardContent>
+                <div className='flex flex-col gap-4 items-center'>
+                  <Typography variant='h6'>Authentication Required</Typography>
+                  <Typography>Please log in again to view your account details.</Typography>
+                  <Button variant='contained' onClick={() => router.push('/login')}>
+                    Go to Login
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
 
-      {/* Main content - only show when not loading and no auth error */}
-      {!isLoading && (!error || (error && !error.includes('session has expired'))) && (
+      {/* Main content - only show when not loading and no error */}
+      {!isLoading && !error && (
         <>
           <Card>
             <CardContent className='mbe-5'>
