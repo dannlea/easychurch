@@ -18,6 +18,9 @@ import MenuItem from '@mui/material/MenuItem'
 import Chip from '@mui/material/Chip'
 import type { SelectChangeEvent } from '@mui/material/Select'
 
+// Import utility functions
+import { buildApiUrl } from '@/core/utils/apiUtils'
+
 type Data = {
   firstName?: string
   lastName?: string
@@ -64,15 +67,10 @@ const AccountDetails = () => {
       try {
         const token = localStorage.getItem('token')
 
-        // Get backend URL without trailing slash
-        const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER
-          ? process.env.NEXT_PUBLIC_LOCAL_SERVER.replace(/\/$/, '')
-          : ''
-
-        console.log('Using backend URL:', backendUrl)
+        console.log('Getting user data...')
 
         // Try the normal endpoint first
-        let response = await fetch(`${backendUrl}/api/users/2`, {
+        let response = await fetch(buildApiUrl('users/2'), {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -81,7 +79,7 @@ const AccountDetails = () => {
         // If the regular endpoint fails, try the simplified one
         if (!response.ok) {
           console.log(`Main API endpoint failed with status ${response.status}. Trying simplified endpoint...`)
-          response = await fetch(`${backendUrl}/api/users-simple/2`)
+          response = await fetch(buildApiUrl('users-simple/2'))
 
           if (!response.ok) {
             throw new Error(`Both API endpoints failed. Last error: ${response.status} ${response.statusText}`)
@@ -209,7 +207,9 @@ const AccountDetails = () => {
 
       try {
         // Send the file and form data to the server
-        const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_SERVER}/users/2`, {
+        const userApiUrl = buildApiUrl('users/2')
+
+        const response = await fetch(userApiUrl, {
           method: 'PUT',
           body: formDataToSend
         })
@@ -251,7 +251,9 @@ const AccountDetails = () => {
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_SERVER}/users/2`, {
+      const userApiUrl = buildApiUrl('users/2')
+
+      const response = await fetch(userApiUrl, {
         method: 'PUT',
         body: formDataToSend
       })

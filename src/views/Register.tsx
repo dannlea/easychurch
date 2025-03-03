@@ -24,14 +24,16 @@ import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 
 // Type Imports
-import type { Mode } from '@core/types'
+import { useImageVariant } from '@core/hooks/useImageVariant'
 
 // Component Imports
 import Logo from '@components/layout/shared/Logo'
 import Illustrations from '@components/Illustrations'
 
-// Hook Imports
-import { useImageVariant } from '@core/hooks/useImageVariant'
+// Import utility functions
+import { buildApiUrl } from '@/core/utils/apiUtils'
+
+import type { Mode } from '@core/types'
 
 const Register = ({ mode }: { mode: Mode }) => {
   const [firstName, setFirstName] = useState('')
@@ -71,16 +73,13 @@ const Register = ({ mode }: { mode: Mode }) => {
       return
     }
 
-    // Get the backend URL from environment variable with fallback for development
-    const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER || 'http://localhost:3001'
-
-    // Ensure backendUrl doesn't end with a slash
-    const baseUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl
-
     try {
-      console.log(`Attempting to register via: ${baseUrl}/auth/register`)
+      // Build the API URL using our utility function
+      const registerUrl = buildApiUrl('auth/register')
 
-      const response = await fetch(`${baseUrl}/auth/register`, {
+      console.log(`Attempting to register via: ${registerUrl}`)
+
+      const response = await fetch(registerUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -26,6 +26,9 @@ import FormControlLabel from '@mui/material/FormControlLabel'
 // Type Imports
 import { jwtDecode } from 'jwt-decode'
 
+// Import utility functions
+import { buildApiUrl } from '@/core/utils/apiUtils'
+
 import type { Mode } from '@core/types'
 import type { User } from '@core/contexts/UserContext'
 
@@ -76,16 +79,13 @@ const Login = ({ mode }: { mode: Mode }) => {
     e.preventDefault()
     setError('')
 
-    // Get the backend URL from environment variable with fallback for development
-    const backendUrl = process.env.NEXT_PUBLIC_LOCAL_SERVER || 'http://localhost:3001'
-
-    // Ensure backendUrl doesn't end with a slash
-    const baseUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl
-
     try {
-      console.log(`Attempting to login via: ${baseUrl}/auth/login`)
+      // Build the API URL using our utility function
+      const loginUrl = buildApiUrl('auth/login')
 
-      const response = await fetch(`${baseUrl}/auth/login`, {
+      console.log(`Attempting to login via: ${loginUrl}`)
+
+      const response = await fetch(loginUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })

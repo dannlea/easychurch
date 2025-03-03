@@ -24,6 +24,9 @@ import Logo from '@components/layout/shared/Logo'
 // Hook Imports
 import { useImageVariant } from '@core/hooks/useImageVariant'
 
+// Import utility functions
+import { buildApiUrl } from '@/core/utils/apiUtils'
+
 NEXT_PUBLIC_LOCAL_SERVER: process.env.LOCAL_SERVER
 
 const NewOrg = ({ mode }: { mode: Mode }) => {
@@ -87,9 +90,11 @@ const NewOrg = ({ mode }: { mode: Mode }) => {
     }
 
     try {
-      console.log('Fetch URL:', `${process.env.NEXT_PUBLIC_LOCAL_SERVER}/register`)
+      const registerUrl = buildApiUrl('register')
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_LOCAL_SERVER}/register`, {
+      console.log('Fetch URL:', registerUrl)
+
+      const response = await fetch(registerUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

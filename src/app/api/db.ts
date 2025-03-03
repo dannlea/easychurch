@@ -1,16 +1,21 @@
 import mariadb from 'mariadb'
 
-// Create a connection pool with reduced connections for shared hosting
+// Determine if we're in production
+const isProduction = process.env.NODE_ENV === 'production'
+
+// Create a connection pool with environment-specific settings
 const pool = mariadb.createPool({
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || '3306'),
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  connectionLimit: 1, // Further reduced to 1 to ensure we don't exceed limits
-  acquireTimeout: 10000, // 10 seconds timeout for connection acquisition
-  idleTimeout: 5000, // Close idle connections after 5 seconds
-  connectTimeout: 5000 // 5 seconds to establish initial connection
+  connectionLimit: isProduction ? 2 : 1, // Slightly higher for production
+  acquireTimeout: isProduction ? 20000 : 10000, // Longer timeout for production
+  idleTimeout: isProduction ? 10000 : 5000, // Close idle connections after 10 seconds in production
+  connectTimeout: isProduction ? 15000 : 5000, // Longer connect timeout for production
+  // Add a trace option for better debugging
+  trace: !isProduction
 })
 
 // Add a shutdown handler to properly close all connections when the app is terminated
@@ -22,12 +27,19 @@ if (typeof process !== 'undefined') {
   })
 }
 
+// Log pool status on interval in development
+if (!isProduction && typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    console.log(`[DB Pool Status] Active: ${pool.activeConnections()}, Total: ${pool.totalConnections()}`)
+  }, 60000) // Log every minute
+}
+
 export default pool
 
 // Helper function to safely execute a database query with retry mechanism
 export async function executeQuery<T>(
   queryFn: (connection: mariadb.PoolConnection) => Promise<T>,
-  retries = 1
+  retries = isProduction ? 3 : 1 // More retries in production
 ): Promise<T> {
   let conn: mariadb.PoolConnection | undefined
   let lastError: Error | undefined
@@ -43,7 +55,22 @@ export async function executeQuery<T>(
       // Log connection pool status
       console.log(`[DB Pool Status] Active: ${pool.activeConnections()}, Total: ${pool.totalConnections()}`)
 
-      conn = await pool.getConnection()
+      // Add timeout for connection acquisition
+      const connectionPromise = pool.getConnection()
+
+      // Set a timeout for connection acquisition
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(
+          () => {
+            reject(new Error(`Connection acquisition timed out after ${isProduction ? 20 : 10} seconds`))
+          },
+          isProduction ? 20000 : 10000
+        )
+      })
+
+      // Race the connection acquisition against the timeout
+      conn = (await Promise.race([connectionPromise, timeoutPromise])) as mariadb.PoolConnection
+
       console.log('Connection acquired successfully')
 
       const result = await queryFn(conn)
