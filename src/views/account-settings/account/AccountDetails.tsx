@@ -22,6 +22,7 @@ import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
 import type { SelectChangeEvent } from '@mui/material/Select'
+import { toast, Toaster } from 'react-hot-toast'
 
 // Import utility functions
 import { buildApiUrl } from '@/core/utils/apiUtils'
@@ -75,7 +76,7 @@ const AccountDetails = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch user data from API
+  // Fetch user data from API when component mounts or userId changes
   useEffect(() => {
     const fetchUserData = async () => {
       setIsLoading(true)
@@ -93,34 +94,23 @@ const AccountDetails = () => {
         return
       }
 
-      let userData = null
-
       try {
         const token = localStorage.getItem('token')
 
         console.log(`Getting user data for ID: ${userId}`)
 
-        // Try the normal endpoint first
-        let response = await fetch(buildApiUrl(`users/${userId}`), {
+        // Use the main users endpoint with proper authentication
+        const response = await fetch(buildApiUrl(`users/${userId}`), {
           headers: {
             Authorization: `Bearer ${token}`
           }
         })
 
-        // If the regular endpoint fails, try the simplified one
         if (!response.ok) {
-          console.log(`Main API endpoint failed with status ${response.status}. Trying simplified endpoint...`)
-          response = await fetch(buildApiUrl(`users-simple/${userId}`))
-
-          if (!response.ok) {
-            throw new Error(`Both API endpoints failed. Last error: ${response.status} ${response.statusText}`)
-          }
+          throw new Error(`Failed to fetch user data: ${response.status} ${response.statusText}`)
         }
 
-        const data = await response.json()
-
-        // Check if data is an array or single object and handle accordingly
-        userData = Array.isArray(data) ? data[0] : data
+        const userData = await response.json()
 
         if (!userData) {
           throw new Error('No user data returned from API')
@@ -131,22 +121,31 @@ const AccountDetails = () => {
           firstName: userData.first_name || '',
           lastName: userData.last_name || '',
           email: userData.email || '',
-          organization: userData.organization_name || '',
+          organization: userData.organization_name || (userData.org_id ? `Organization #${userData.org_id}` : ''),
           phoneNumber: userData.phone_number || '',
           address: userData.address || '',
           state: userData.state || '',
           zipCode: userData.zip_code || '',
           country: userData.country || '',
           language: userData.language || '',
-          timezone: userData.time_zone || 'gmt-05', // Default value
-          currency: userData.currency || 'usd' // Default value
+          timezone: userData.time_zone || 'gmt-05',
+          currency: userData.currency || 'usd'
         })
 
-        // Set the avatar image source if available
+        // Set image source if profile picture exists
         if (userData.profile_picture) {
-          const picturePath = userData.profile_picture
+          const imgPath = userData.profile_picture
 
-          setImgSrc(picturePath)
+          // Handle assets path
+          if (imgPath.startsWith('/assets/')) {
+            setImgSrc(buildApiUrl(`assets/${imgPath.substring(8)}`))
+          } else if (imgPath.startsWith('/images/')) {
+            // Public images path
+            setImgSrc(imgPath)
+          } else {
+            // Fallback to placeholder
+            setImgSrc('/images/placeholder.png')
+          }
         }
 
         setIsLoading(false)
@@ -158,7 +157,7 @@ const AccountDetails = () => {
     }
 
     fetchUserData()
-  }, [user, searchParams]) // Add searchParams to dependency array
+  }, [user, searchParams])
 
   const handleDelete = (value: string) => {
     setLanguage(current => current.filter(item => item !== value))
@@ -233,71 +232,100 @@ const AccountDetails = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Get user ID from URL params if available, otherwise use user context
-    const urlUserId = searchParams.get('id')
-    const userId = urlUserId || (user?.id ? String(user.id) : null)
-
-    // Ensure we have a user ID
-    if (!userId) {
-      console.error('Cannot update user profile: No user ID available')
-
-      return
-    }
-
-    const formDataToSend = new FormData()
-
-    formDataToSend.append('firstName', formData.firstName || '')
-    formDataToSend.append('lastName', formData.lastName || '')
-    formDataToSend.append('email', formData.email || '')
-    formDataToSend.append('phoneNumber', formData.phoneNumber?.toString() || '')
-    formDataToSend.append('address', formData.address || '')
-    formDataToSend.append('state', formData.state || '')
-    formDataToSend.append('zipCode', formData.zipCode || '')
-    formDataToSend.append('country', formData.country || '')
-    formDataToSend.append('timezone', formData.timezone || '')
-    formDataToSend.append('currency', formData.currency || '')
-
-    if (fileInput) {
-      formDataToSend.append('avatar', fileInput) // Append the file
-    }
+    setIsLoading(true)
+    setError(null)
 
     try {
-      const userApiUrl = buildApiUrl(`users/${userId}`)
+      // Get user ID from URL params if available, otherwise use user context
+      const urlUserId = searchParams.get('id')
+      const userId = urlUserId || (user?.id ? String(user.id) : null)
 
-      const response = await fetch(userApiUrl, {
+      if (!userId) {
+        throw new Error('No user ID available for update')
+      }
+
+      const token = localStorage.getItem('token')
+
+      const response = await fetch(buildApiUrl(`users/${userId}`), {
         method: 'PUT',
-        body: formDataToSend
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          email: formData.email,
+          organization_name: formData.organization,
+          phone_number: formData.phoneNumber,
+          address: formData.address,
+          state: formData.state,
+          zip_code: formData.zipCode,
+          country: formData.country,
+          language: formData.language,
+          time_zone: formData.timezone,
+          currency: formData.currency
+        })
       })
 
-      if (response.ok) {
-        console.log('User updated successfully')
-      } else {
-        console.error('Failed to update user')
+      if (!response.ok) {
+        throw new Error(`Failed to update user: ${response.status} ${response.statusText}`)
       }
-    } catch (error) {
-      console.error('Error updating user:', error)
+
+      // Update the file if it was changed
+      if (fileInput) {
+        const fileFormData = new FormData()
+
+        fileFormData.append('avatar', fileInput)
+
+        const fileResponse = await fetch(buildApiUrl(`users/${userId}/avatar`), {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: fileFormData
+        })
+
+        if (!fileResponse.ok) {
+          console.warn('Failed to upload profile picture:', fileResponse.status, fileResponse.statusText)
+
+          // Don't fail the whole operation if just the image upload fails
+          toast('Profile updated but image upload failed', {
+            icon: '⚠️',
+            style: {
+              borderRadius: '10px',
+              background: '#FFF3CD',
+              color: '#856404'
+            }
+          })
+        }
+      }
+
+      toast.success('Profile updated successfully')
+    } catch (err) {
+      console.error('Error updating profile:', err)
+      setError(err instanceof Error ? err.message : 'An unknown error occurred')
+      toast.error('Failed to update profile')
+    } finally {
+      setIsLoading(false)
     }
   }
 
   return (
-    <>
+    <div className='flex flex-col gap-7'>
+      <Toaster position='top-right' />
       {isLoading && (
         <Card>
-          <CardContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+          <CardContent className='flex justify-center'>
             <CircularProgress />
           </CardContent>
         </Card>
       )}
-
       {error && (
-        <Card>
-          <CardContent>
-            <Alert severity='error'>{error}</Alert>
-          </CardContent>
-        </Card>
+        <Alert severity='error' sx={{ mb: 4 }}>
+          {error}
+        </Alert>
       )}
-
       {!isLoading && !error && (
         <>
           <Card>
@@ -484,7 +512,7 @@ const AccountDetails = () => {
           </Card>
         </>
       )}
-    </>
+    </div>
   )
 }
 
