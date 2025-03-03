@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server'
 import { executeQuery } from '../db'
 import { verifyAuth, unauthorized } from '../auth-utils'
 
+// Force dynamic rendering for this route since it uses request properties
+export const dynamic = 'force-dynamic'
+
 // GET all users
 export async function GET(request: NextRequest) {
   // Check authentication

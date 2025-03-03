@@ -5,6 +5,9 @@ import path from 'path'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Force dynamic rendering for this route since it uses request properties
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     // Get the directory structure for API routes
