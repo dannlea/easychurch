@@ -12,6 +12,8 @@ import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
+import Button from '@mui/material/Button'
+import PrintIcon from '@mui/icons-material/Print'
 
 // Third-party Imports
 import axios from 'axios'
@@ -162,6 +164,144 @@ const BirthdayTable = () => {
     'December'
   ]
 
+  const handlePrint = () => {
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank')
+
+    if (!printWindow) {
+      alert('Please allow popups for this website')
+
+      return
+    }
+
+    // Get the month name
+    const monthName = months[parseInt(selectedMonth) - 1]
+
+    // Generate the HTML content for printing
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${monthName} Birthdays</title>
+          <style>
+            @media print {
+              @page {
+                margin: 0.5in;
+              }
+              body {
+                font-family: Arial, sans-serif;
+                color: #333;
+                line-height: 1.5;
+                position: relative;
+                min-height: 100vh;
+              }
+              .header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 20px;
+                border-bottom: 1px solid #ddd;
+                padding-bottom: 10px;
+              }
+              .title {
+                font-size: 24px;
+                font-weight: bold;
+                display: flex;
+                align-items: center;
+              }
+              .logo {
+                margin-right: 10px;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+              }
+              th {
+                text-align: left;
+                padding: 8px;
+                border-bottom: 2px solid #ddd;
+                font-weight: bold;
+              }
+              td {
+                padding: 8px;
+                border-bottom: 1px solid #eee;
+              }
+              .page-break {
+                page-break-after: always;
+              }
+              .no-print {
+                display: none;
+              }
+              .footer {
+                font-style: italic;
+                color: #777;
+                opacity: 0.6;
+                text-align: center;
+                margin-top: 20px;
+                padding-top: 10px;
+                border-top: 1px solid #eee;
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">
+              <span>EasyChurch</span>
+            </div>
+            <div>${monthName} Birthdays</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Birthday</th>
+                <th>Age</th>
+                <th>Address</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredPeople
+                .map(
+                  person => `
+                <tr>
+                  <td>${person.firstName} ${person.lastName}</td>
+                  <td>${formatDate(person.birthdate)}</td>
+                  <td>${person.ageNext}</td>
+                  <td>${person.address}</td>
+                </tr>
+              `
+                )
+                .join('')}
+            </tbody>
+          </table>
+          <div class="footer">
+            There are ${peopleWithoutBirthdays} users in your People database without birthdays.
+          </div>
+        </body>
+      </html>
+    `
+
+    // Write the content to the new window
+    printWindow.document.open()
+    printWindow.document.write(printContent)
+    printWindow.document.close()
+
+    // Wait for content to load before printing
+    printWindow.onload = function () {
+      // Small delay to ensure everything is rendered properly
+      setTimeout(() => {
+        printWindow.print()
+
+        // printWindow.close() // Optional: close after printing
+      }, 300)
+    }
+  }
+
   return (
     <Grid container spacing={6}>
       <Grid item xs={12}>
@@ -169,7 +309,7 @@ const BirthdayTable = () => {
           <CardContent>
             <form onSubmit={e => e.preventDefault()}>
               <Grid container spacing={5}>
-                <Grid item xs={12} sm={12}>
+                <Grid item xs={12} sm={9}>
                   <FormControl fullWidth>
                     <InputLabel>Select Birthday Month</InputLabel>
                     <Select
@@ -187,6 +327,18 @@ const BirthdayTable = () => {
                       ))}
                     </Select>
                   </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={3} sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Button
+                    variant='contained'
+                    color='primary'
+                    onClick={handlePrint}
+                    startIcon={<PrintIcon />}
+                    disabled={loading || filteredPeople.length === 0}
+                    fullWidth
+                  >
+                    Print
+                  </Button>
                 </Grid>
               </Grid>
             </form>
