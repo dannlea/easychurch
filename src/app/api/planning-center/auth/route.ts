@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 
 // Mark this route as dynamic to fix the deployment error
 export const dynamic = 'force-dynamic'
@@ -18,14 +19,33 @@ export async function GET(request: Request) {
     // Generate a random state parameter for security
     const state = crypto.randomBytes(16).toString('hex')
 
-    // Get the host from the request
-    const requestUrl = new URL(request.url)
-    const host = requestUrl.origin
+    // Get headers to check for forwarded host
+    const headersList = headers()
+    const xForwardedHost = headersList.get('x-forwarded-host')
+    const xForwardedProto = headersList.get('x-forwarded-proto') || 'https'
+    const host = headersList.get('host')
 
-    // Build a dynamic redirect URI based on the current host
-    const dynamicRedirectUri = `${host}/api/planning-center/callback`
+    // Determine the actual host, prioritizing forwarded headers for proxies like ngrok
+    let actualHost: string
 
-    // Use dynamic redirect URI or fall back to environment variable
+    if (xForwardedHost) {
+      // Use forwarded host (e.g., from ngrok)
+      actualHost = `${xForwardedProto}://${xForwardedHost}`
+      console.log('Using forwarded host:', actualHost)
+    } else if (host) {
+      // Fall back to the regular host header
+      actualHost = `https://${host}`
+      console.log('Using host header:', actualHost)
+    } else {
+      // Last resort - parse from request URL
+      const requestUrl = new URL(request.url)
+
+      actualHost = requestUrl.origin
+      console.log('Using request URL origin:', actualHost)
+    }
+
+    // Build a dynamic redirect URI based on the detected host
+    const dynamicRedirectUri = `${actualHost}/api/planning-center/callback`
     const redirectUri = dynamicRedirectUri || DEFAULT_REDIRECT_URI || ''
     const encodedUri = encodeURIComponent(redirectUri)
 
@@ -36,7 +56,7 @@ export async function GET(request: Request) {
       `client_id=${CLIENT_ID}&` +
       `redirect_uri=${encodedUri}&` +
       `response_type=code&` +
-      `scope=people services&` + // Add services scope to the requested scopes
+      `scope=people services&` + // Include both people and services scopes
       `state=${state}`
 
     console.log('Generated Authorization URL:', authUrl)

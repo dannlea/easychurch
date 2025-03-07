@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 
 import axios from 'axios'
 
@@ -28,14 +27,33 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
 
-    // Get the host from the request
-    const requestUrl = new URL(request.url)
-    const host = requestUrl.origin
+    // Get headers to check for forwarded host
+    const headersList = headers()
+    const xForwardedHost = headersList.get('x-forwarded-host')
+    const xForwardedProto = headersList.get('x-forwarded-proto') || 'https'
+    const host = headersList.get('host')
 
-    // Build a dynamic redirect URI based on the current host
-    const dynamicRedirectUri = `${host}/api/planning-center/callback`
+    // Determine the actual host, prioritizing forwarded headers for proxies like ngrok
+    let actualHost: string
 
-    // Use dynamic redirect URI or fall back to environment variable
+    if (xForwardedHost) {
+      // Use forwarded host (e.g., from ngrok)
+      actualHost = `${xForwardedProto}://${xForwardedHost}`
+      console.log('Using forwarded host for callback:', actualHost)
+    } else if (host) {
+      // Fall back to the regular host header
+      actualHost = `https://${host}`
+      console.log('Using host header for callback:', actualHost)
+    } else {
+      // Last resort - parse from request URL
+      const requestUrl = new URL(request.url)
+
+      actualHost = requestUrl.origin
+      console.log('Using request URL origin for callback:', actualHost)
+    }
+
+    // Build a dynamic redirect URI based on the detected host
+    const dynamicRedirectUri = `${actualHost}/api/planning-center/callback`
     const redirectUri = dynamicRedirectUri || DEFAULT_REDIRECT_URI || ''
 
     console.log('Using redirect URI for token exchange:', redirectUri)
@@ -60,12 +78,23 @@ export async function GET(request: Request) {
     console.log('Access token received and stored')
 
     // Use the same host for the redirect back to the application
-    return NextResponse.redirect(`${host}/birthdays`)
+    return NextResponse.redirect(`${actualHost}/service-plans`)
   } catch (error: any) {
     console.error('Error during token exchange:', error)
 
-    // Use the request origin as the base URL for redirects
-    const baseUrl = new URL(request.url).origin
+    // Get host for error redirect
+    const headersList = headers()
+    const xForwardedHost = headersList.get('x-forwarded-host')
+    const xForwardedProto = headersList.get('x-forwarded-proto') || 'https'
+    const host = headersList.get('host')
+
+    let baseUrl = 'https://localhost:3000'
+
+    if (xForwardedHost) {
+      baseUrl = `${xForwardedProto}://${xForwardedHost}`
+    } else if (host) {
+      baseUrl = `https://${host}`
+    }
 
     return NextResponse.redirect(`${baseUrl}/login`)
   }

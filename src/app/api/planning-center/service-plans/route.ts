@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 
 import axios from 'axios'
 
@@ -12,23 +12,46 @@ let progress = 0 // Track progress
 
 export async function GET(request: Request) {
   try {
+    // Check if this is a progress request
+    if (request.url.includes('progress')) {
+      return NextResponse.json({ progress })
+    }
+
     // Retrieve the access token from the cookie
     const accessToken = cookies().get('access_token')?.value
 
     if (!accessToken) {
       console.log('No access token found, redirecting to auth')
 
-      // Create a URL that preserves the original host
-      const authUrl = new URL('/api/planning-center/auth', request.url)
+      // Get headers to check for forwarded host
+      const headersList = headers()
+      const xForwardedHost = headersList.get('x-forwarded-host')
+      const xForwardedProto = headersList.get('x-forwarded-proto') || 'https'
+      const host = headersList.get('host')
+
+      // Determine the actual host
+      let actualHost: string
+
+      if (xForwardedHost) {
+        actualHost = `${xForwardedProto}://${xForwardedHost}`
+        console.log('Using forwarded host for auth redirect:', actualHost)
+      } else if (host) {
+        actualHost = `https://${host}`
+        console.log('Using host header for auth redirect:', actualHost)
+      } else {
+        const requestUrl = new URL(request.url)
+
+        actualHost = requestUrl.origin
+        console.log('Using request URL origin for auth redirect:', actualHost)
+      }
+
+      // Create auth URL with the correct host
+      const authUrl = new URL('/api/planning-center/auth', actualHost)
 
       return NextResponse.redirect(authUrl)
     }
 
-    console.log('Using Access Token:', accessToken) // Log the access token
-
-    if (request.url.includes('progress')) {
-      return NextResponse.json({ progress })
-    }
+    console.log('Using Access Token:', accessToken)
 
     // Get all service types first
     console.log('Fetching service types from:', `${BASE_URL}/service_types`)
@@ -37,7 +60,7 @@ export async function GET(request: Request) {
       headers: {
         Authorization: `Bearer ${accessToken}`
       },
-      timeout: 10000 // Set a timeout of 10 seconds
+      timeout: 10000 // Same timeout as People API
     })
 
     const serviceTypes = serviceTypesResponse.data.data
@@ -158,8 +181,30 @@ export async function GET(request: Request) {
     if (error.response?.status === 401) {
       console.log('Unauthorized, redirecting to auth')
 
-      // Create a URL that preserves the original host
-      const authUrl = new URL('/api/planning-center/auth', request.url)
+      // Get headers to check for forwarded host
+      const headersList = headers()
+      const xForwardedHost = headersList.get('x-forwarded-host')
+      const xForwardedProto = headersList.get('x-forwarded-proto') || 'https'
+      const host = headersList.get('host')
+
+      // Determine the actual host
+      let actualHost: string
+
+      if (xForwardedHost) {
+        actualHost = `${xForwardedProto}://${xForwardedHost}`
+        console.log('Using forwarded host for auth redirect:', actualHost)
+      } else if (host) {
+        actualHost = `https://${host}`
+        console.log('Using host header for auth redirect:', actualHost)
+      } else {
+        const requestUrl = new URL(request.url)
+
+        actualHost = requestUrl.origin
+        console.log('Using request URL origin for auth redirect:', actualHost)
+      }
+
+      // Create auth URL with the correct host
+      const authUrl = new URL('/api/planning-center/auth', actualHost)
 
       return NextResponse.redirect(authUrl)
     }
