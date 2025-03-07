@@ -18,7 +18,10 @@ export async function GET(request: Request) {
     if (!accessToken) {
       console.log('No access token found, redirecting to auth')
 
-      return NextResponse.redirect(new URL('/api/planning-center/auth', request.url))
+      // Create a URL that preserves the original host
+      const authUrl = new URL('/api/planning-center/auth', request.url)
+
+      return NextResponse.redirect(authUrl)
     }
 
     console.log('Using Access Token:', accessToken) // Log the access token
@@ -155,7 +158,10 @@ export async function GET(request: Request) {
     if (error.response?.status === 401) {
       console.log('Unauthorized, redirecting to auth')
 
-      return NextResponse.redirect(new URL('/api/planning-center/auth', request.url))
+      // Create a URL that preserves the original host
+      const authUrl = new URL('/api/planning-center/auth', request.url)
+
+      return NextResponse.redirect(authUrl)
     }
 
     return NextResponse.json(
