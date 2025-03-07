@@ -72,32 +72,75 @@ const ServicePlansTable = () => {
         setError(null)
 
         console.log('Fetching service plans from API...')
-        const response = await axios.get('/api/planning-center/service-plans')
 
-        const data = response.data
+        // First, try with normal request
+        try {
+          const response = await axios.get('/api/planning-center/service-plans', {
+            timeout: 15000,
+            validateStatus: status => status < 500 // Accept any status less than 500
+          })
 
-        console.log('API Response:', data)
+          // Check headers for mock data flag
+          const usingMockData = response.headers['x-using-mock-data'] === 'true'
+          const errorMessage = response.headers['x-error-message'] || response.headers['x-error-reason']
 
-        if (data && Array.isArray(data)) {
-          setServicePlans(data)
-          setFilteredPlans(data)
-        } else {
-          console.error('Invalid data format:', data)
-          setError('Invalid data format received')
+          const data = response.data
+
+          console.log('API Response:', data)
+
+          if (data && Array.isArray(data)) {
+            // Also check the data itself for mock indicators
+            const isMockData =
+              usingMockData || (data.length > 0 && data[0].title && data[0].title.includes('Mock Data'))
+
+            setServicePlans(data)
+            setFilteredPlans(data)
+
+            if (isMockData) {
+              setError(
+                `Using mock data: ${errorMessage || 'Connection issues with Planning Center'}. Some features may be limited.`
+              )
+            }
+          } else {
+            throw new Error('Invalid data format received')
+          }
+        } catch (initialErr: any) {
+          console.error('Initial fetch error:', initialErr)
+
+          // If initial request fails with network error, try explicit mock request
+          if (
+            initialErr.code === 'ERR_NETWORK' ||
+            (initialErr.message && (initialErr.message.includes('Network Error') || initialErr.message.includes('SSL')))
+          ) {
+            console.log('Network error, trying mock data...')
+
+            const mockResponse = await axios.get('/api/planning-center/service-plans?mock=true', {
+              timeout: 5000
+            })
+
+            if (mockResponse.data && Array.isArray(mockResponse.data)) {
+              setServicePlans(mockResponse.data)
+              setFilteredPlans(mockResponse.data)
+              setError(
+                'Using mock data due to connection issues. Planning Center may be unavailable or there might be network issues.'
+              )
+            } else {
+              throw new Error('Failed to fetch mock data')
+            }
+          } else if (initialErr.response?.status === 401 || initialErr.response?.status === 403) {
+            console.log('Authentication required, redirecting...')
+            setError('Authentication required. Redirecting to login...')
+
+            setTimeout(() => {
+              router.push('/api/planning-center/auth')
+            }, 2000)
+          } else {
+            throw initialErr // re-throw for the outer catch
+          }
         }
       } catch (err: any) {
-        console.error('Fetch error:', err)
-
-        if (err.response?.status === 401 || err.response?.status === 403) {
-          console.log('Authentication required, redirecting...')
-          setError('Authentication required. Redirecting to login...')
-
-          setTimeout(() => {
-            router.push('/api/planning-center/auth')
-          }, 2000)
-        } else {
-          setError('Failed to fetch service plans from Planning Center')
-        }
+        console.error('Final fetch error:', err)
+        setError(`Failed to fetch service plans: ${err.message || 'Unknown error'}. Please try again later.`)
       } finally {
         setLoading(false)
       }
@@ -109,22 +152,35 @@ const ServicePlansTable = () => {
   useEffect(() => {
     const fetchProgress = async () => {
       try {
-        const response = await axios.get('/api/planning-center/service-plans?progress')
+        // Only poll for progress if we're still loading
+        if (!loading) {
+          return
+        }
+
+        const response = await axios.get('/api/planning-center/service-plans?progress', {
+          timeout: 3000 // Shorter timeout for progress requests
+        })
 
         setPlansReceived(response.data.progress)
-
-        // Stop polling when loading is complete
-        if (!loading) {
-          clearInterval(intervalId)
-        }
       } catch (err) {
         console.error('Error fetching progress:', err)
+
+        // No need to show error for progress polling
       }
     }
 
-    const intervalId = setInterval(fetchProgress, 1000) // Poll every second
+    // Only start polling if we're loading
+    let intervalId: NodeJS.Timeout | null = null
 
-    return () => clearInterval(intervalId) // Cleanup on unmount
+    if (loading) {
+      intervalId = setInterval(fetchProgress, 1000) // Poll every second
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId) // Cleanup on unmount or when loading changes
+      }
+    }
   }, [loading])
 
   useEffect(() => {
