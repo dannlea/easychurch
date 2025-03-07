@@ -1,5 +1,3 @@
-import https from 'https'
-
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
@@ -11,14 +9,6 @@ export const dynamic = 'force-dynamic'
 const BASE_URL = 'https://api.planningcenteronline.com/services/v2'
 
 let progress = 0 // Track progress
-
-// Create a custom axios instance with SSL handling
-const axiosInstance = axios.create({
-  httpsAgent: new https.Agent({
-    rejectUnauthorized: false // This allows self-signed certificates and bypasses strict SSL checking
-  }),
-  timeout: 15000 // Increase timeout
-})
 
 export async function GET(request: Request) {
   try {
@@ -48,34 +38,15 @@ export async function GET(request: Request) {
 
     console.log('Using Access Token:', accessToken)
 
+    // Get all service types first - using the same axios instance as the People API
     try {
-      // Test the token validity with a simple API call before proceeding
-      try {
-        await axiosInstance.get(`${BASE_URL}/me`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            Accept: 'application/json'
-          }
-        })
-      } catch (tokenErr: any) {
-        if (tokenErr.response?.status === 401) {
-          console.log('Token is invalid or expired, redirecting to auth')
-
-          return NextResponse.redirect(new URL('/api/planning-center/auth', request.url))
-        }
-
-        // If it's not a 401 error, continue with the process
-      }
-
-      // Get all service types first
       console.log('Fetching service types from:', `${BASE_URL}/service_types`)
 
-      const serviceTypesResponse = await axiosInstance.get(`${BASE_URL}/service_types`, {
+      const serviceTypesResponse = await axios.get(`${BASE_URL}/service_types`, {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${accessToken}`
+        },
+        timeout: 10000 // Same timeout as People API
       })
 
       const serviceTypes = serviceTypesResponse.data.data
@@ -93,7 +64,7 @@ export async function GET(request: Request) {
         const serviceTypeId = serviceType.id
         const serviceTypeName = serviceType.attributes.name
 
-        // Get plans for this service type
+        // Get plans for this service type - using the same URL structure as People API
         const plansUrl = `${BASE_URL}/service_types/${serviceTypeId}/plans?include=team_members&order=sort_date`
 
         console.log(`Fetching plans for service type: ${serviceTypeName} from ${plansUrl}`)
@@ -101,12 +72,11 @@ export async function GET(request: Request) {
         let nextPage = plansUrl
 
         while (nextPage) {
-          const plansResponse = await axiosInstance.get(nextPage, {
+          const plansResponse = await axios.get(nextPage, {
             headers: {
-              Authorization: `Bearer ${accessToken}`,
-              Accept: 'application/json',
-              'Content-Type': 'application/json'
-            }
+              Authorization: `Bearer ${accessToken}`
+            },
+            timeout: 10000 // Same timeout as People API
           })
 
           const plansData = plansResponse.data.data || []
@@ -187,56 +157,57 @@ export async function GET(request: Request) {
       console.log('Successfully fetched service plans from Planning Center')
 
       return NextResponse.json(formattedData)
-    } catch (apiError: any) {
-      console.error('API Call Error:', {
-        message: apiError.message,
-        response: apiError.response?.data,
-        status: apiError.response?.status,
-        code: apiError.code
+    } catch (error: any) {
+      console.error('Planning Center API Error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
       })
 
-      // Token expired or invalid
-      if (apiError.response?.status === 401) {
-        console.log('Unauthorized, redirecting to auth')
-
-        return NextResponse.redirect(new URL('/api/planning-center/auth', request.url))
-      }
-
-      // Handle specific SSL errors
+      // Handle network errors by falling back to mock data
       if (
-        apiError.code === 'EPROTO' ||
-        apiError.code === 'ERR_NETWORK' ||
-        apiError.message.includes('SSL') ||
-        apiError.message.includes('Network Error')
+        error.code === 'EPROTO' ||
+        error.code === 'ERR_NETWORK' ||
+        error.message.includes('SSL') ||
+        error.message.includes('Network Error')
       ) {
-        console.error('SSL/Network Error when connecting to Planning Center')
+        console.error('Network Error when connecting to Planning Center, using mock data')
 
         return NextResponse.json(getMockServicePlans(), {
           status: 200,
           headers: {
             'X-Using-Mock-Data': 'true',
-            'X-Error-Message': 'SSL or network error when connecting to Planning Center API'
+            'X-Error-Message': 'Network error when connecting to Planning Center API'
           }
         })
       }
 
-      throw apiError
+      if (error.response?.status === 401) {
+        console.log('Unauthorized, redirecting to auth')
+
+        return NextResponse.redirect(new URL('/api/planning-center/auth', request.url))
+      }
+
+      // Fallback to mock data for other errors
+      console.log('Falling back to mock data due to error:', error.message)
+
+      return NextResponse.json(getMockServicePlans(), {
+        status: 200,
+        headers: {
+          'X-Using-Mock-Data': 'true',
+          'X-Error-Reason': error.message || 'Unknown error'
+        }
+      })
     }
-  } catch (error: any) {
-    console.error('Planning Center API Error:', {
-      message: error.message,
-      code: error.code,
-      name: error.name
-    })
+  } catch (outerError: any) {
+    console.error('Unexpected error:', outerError)
 
-    // Fallback to mock data with headers indicating there was an error
-    console.log('Falling back to mock data due to error:', error.message)
-
+    // Final fallback to mock data
     return NextResponse.json(getMockServicePlans(), {
       status: 200,
       headers: {
         'X-Using-Mock-Data': 'true',
-        'X-Error-Reason': error.message || 'Unknown error'
+        'X-Error-Reason': 'Unexpected error'
       }
     })
   }
