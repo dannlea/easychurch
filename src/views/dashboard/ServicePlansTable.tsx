@@ -45,6 +45,47 @@ interface TeamMember {
   avatar: string
 }
 
+// Add local mock data constant at the top, outside the component
+const LOCAL_MOCK_SERVICE_PLANS: ServicePlan[] = [
+  {
+    id: 'local-plan1',
+    title: 'Sunday Morning Worship (Local Mock)',
+    date: '2025-03-10',
+    time: '9:00 AM',
+    serviceName: 'Sunday Service',
+    leaderName: 'John Smith',
+    leaderId: 'leader1',
+    leaderAvatar: '',
+    teamMembers: [
+      {
+        id: 'tm1',
+        name: 'Sarah Johnson',
+        role: 'Worship Leader',
+        avatar: ''
+      },
+      {
+        id: 'tm2',
+        name: 'Mike Davis',
+        role: 'Piano',
+        avatar: ''
+      }
+    ],
+    status: 'confirmed'
+  },
+  {
+    id: 'local-plan2',
+    title: 'Sunday Evening Worship (Local Mock)',
+    date: '2025-03-10',
+    time: '6:00 PM',
+    serviceName: 'Evening Service',
+    leaderName: 'Jane Wilson',
+    leaderId: 'leader2',
+    leaderAvatar: '',
+    teamMembers: [],
+    status: 'planned'
+  }
+]
+
 const formatDate = (dateString: string) => {
   const options: Intl.DateTimeFormatOptions = {
     weekday: 'long',
@@ -73,10 +114,10 @@ const ServicePlansTable = () => {
 
         console.log('Fetching service plans from API...')
 
-        // First, try with normal request
+        // Try with a very short timeout first to quickly detect network issues
         try {
           const response = await axios.get('/api/planning-center/service-plans', {
-            timeout: 15000,
+            timeout: 5000, // Short timeout to fail fast if there are network issues
             validateStatus: status => status < 500 // Accept any status less than 500
           })
 
@@ -90,8 +131,7 @@ const ServicePlansTable = () => {
 
           if (data && Array.isArray(data)) {
             // Also check the data itself for mock indicators
-            const isMockData =
-              usingMockData || (data.length > 0 && data[0].title && data[0].title.includes('Mock Data'))
+            const isMockData = usingMockData || (data.length > 0 && data[0].title && data[0].title.includes('Mock'))
 
             setServicePlans(data)
             setFilteredPlans(data)
@@ -107,40 +147,32 @@ const ServicePlansTable = () => {
         } catch (initialErr: any) {
           console.error('Initial fetch error:', initialErr)
 
-          // If initial request fails with network error, try explicit mock request
-          if (
-            initialErr.code === 'ERR_NETWORK' ||
-            (initialErr.message && (initialErr.message.includes('Network Error') || initialErr.message.includes('SSL')))
-          ) {
-            console.log('Network error, trying mock data...')
+          // If we get here, we have network issues or other errors that prevent us from
+          // even reaching our own API. Fall back to local mock data immediately.
+          console.log('Network issues detected, using local mock data without API call')
 
-            const mockResponse = await axios.get('/api/planning-center/service-plans?mock=true', {
-              timeout: 5000
-            })
+          setServicePlans(LOCAL_MOCK_SERVICE_PLANS)
+          setFilteredPlans(LOCAL_MOCK_SERVICE_PLANS)
+          setError(
+            'Using local mock data due to connection issues. Check your network connection or Planning Center may be unavailable.'
+          )
 
-            if (mockResponse.data && Array.isArray(mockResponse.data)) {
-              setServicePlans(mockResponse.data)
-              setFilteredPlans(mockResponse.data)
-              setError(
-                'Using mock data due to connection issues. Planning Center may be unavailable or there might be network issues.'
-              )
-            } else {
-              throw new Error('Failed to fetch mock data')
-            }
-          } else if (initialErr.response?.status === 401 || initialErr.response?.status === 403) {
-            console.log('Authentication required, redirecting...')
-            setError('Authentication required. Redirecting to login...')
-
-            setTimeout(() => {
-              router.push('/api/planning-center/auth')
-            }, 2000)
+          // Log the specific error for debugging
+          if (initialErr.response?.status === 401) {
+            console.log('Authentication error with Planning Center')
+          } else if (initialErr.code === 'ERR_NETWORK' || initialErr.message?.includes('Network Error')) {
+            console.log('Network connectivity issues detected')
           } else {
-            throw initialErr // re-throw for the outer catch
+            console.log('Other error:', initialErr.message)
           }
         }
       } catch (err: any) {
         console.error('Final fetch error:', err)
-        setError(`Failed to fetch service plans: ${err.message || 'Unknown error'}. Please try again later.`)
+
+        // Final fallback if something unexpected happens
+        setServicePlans(LOCAL_MOCK_SERVICE_PLANS)
+        setFilteredPlans(LOCAL_MOCK_SERVICE_PLANS)
+        setError(`Using local mock data. ${err.message || 'Unknown error'}. Please try again later.`)
       } finally {
         setLoading(false)
       }
