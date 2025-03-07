@@ -62,6 +62,7 @@ const ServicePlansTable = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedServiceType, setSelectedServiceType] = useState('all')
+  const [plansReceived, setPlansReceived] = useState<number>(0)
   const router = useRouter()
 
   useEffect(() => {
@@ -92,6 +93,27 @@ const ServicePlansTable = () => {
 
     fetchServicePlans()
   }, [router])
+
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const response = await axios.get('/api/planning-center/service-plans?progress')
+
+        setPlansReceived(response.data.progress)
+
+        // Stop polling when loading is complete
+        if (!loading) {
+          clearInterval(intervalId)
+        }
+      } catch (err) {
+        console.error('Error fetching progress:', err)
+      }
+    }
+
+    const intervalId = setInterval(fetchProgress, 1000) // Poll every second
+
+    return () => clearInterval(intervalId) // Cleanup on unmount
+  }, [loading])
 
   useEffect(() => {
     if (selectedServiceType === 'all') {
@@ -340,7 +362,7 @@ const ServicePlansTable = () => {
                   <tr>
                     <td colSpan={6}>
                       <Typography align='center' className='animate-pulse italic'>
-                        Loading service plans...
+                        Loading service plans... {plansReceived > 0 ? `${plansReceived} plans received` : ''}
                       </Typography>
                     </td>
                   </tr>

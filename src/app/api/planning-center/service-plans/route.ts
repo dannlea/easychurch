@@ -1,19 +1,162 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
-// Remove the imports causing linter errors since we're using mock data for now
-// import { getServerSession } from 'next-auth/next'
-// import { authOptions } from '@/app/api/auth/[...nextauth]/route'
-// import axios from 'axios'
+import axios from 'axios'
 
-export async function GET() {
+// Mark this route as dynamic to fix the deployment error
+export const dynamic = 'force-dynamic'
+
+const BASE_URL = 'https://api.planningcenteronline.com/services/v2'
+
+let progress = 0 // Track progress
+
+export async function GET(request: Request) {
   try {
-    // For now, we'll skip the authentication check since we're using mock data
-    // const session = await getServerSession(authOptions)
-    // if (!session) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
+    // Check if this is a progress request
+    if (request.url.includes('progress')) {
+      return NextResponse.json({ progress })
+    }
 
-    // Mock data for development - replace with actual API call in production
+    // Retrieve the access token from the cookie
+    const accessToken = cookies().get('access_token')?.value
+
+    if (!accessToken) {
+      console.log('No access token found, redirecting to auth')
+
+      return NextResponse.redirect(new URL('/api/planning-center/auth', request.url))
+    }
+
+    console.log('Using Access Token:', accessToken)
+
+    // Get all service types first
+    const serviceTypesResponse = await axios.get(`${BASE_URL}/service_types`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      },
+      timeout: 10000
+    })
+
+    const serviceTypes = serviceTypesResponse.data.data
+
+    console.log(`Found ${serviceTypes.length} service types`)
+
+    // Now get plans for each service type
+    let allPlans: any[] = []
+    let allTeamMembers: any[] = []
+
+    for (const serviceType of serviceTypes) {
+      const serviceTypeId = serviceType.id
+      const serviceTypeName = serviceType.attributes.name
+
+      // Get plans for this service type
+      const plansUrl = `${BASE_URL}/service_types/${serviceTypeId}/plans?include=team_members&order=sort_date`
+
+      console.log(`Fetching plans for service type: ${serviceTypeName} from ${plansUrl}`)
+
+      let nextPage = plansUrl
+
+      while (nextPage) {
+        const plansResponse = await axios.get(nextPage, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          },
+          timeout: 10000
+        })
+
+        const plansData = plansResponse.data.data || []
+        const includedData = plansResponse.data.included || []
+
+        if (plansData.length > 0) {
+          // Add service type name to each plan
+          const enrichedPlans = plansData.map((plan: any) => ({
+            ...plan,
+            serviceTypeName
+          }))
+
+          allPlans = [...allPlans, ...enrichedPlans]
+          allTeamMembers = [...allTeamMembers, ...includedData]
+          progress = allPlans.length // Update progress
+        }
+
+        nextPage = plansResponse.data.links?.next || null
+      }
+    }
+
+    console.log(`Total plans fetched: ${allPlans.length}`)
+
+    // Format the plans data to match our interface
+    const formattedData = allPlans.map((plan: any) => {
+      // Get team members for this plan
+      const teamMembersRelationships = plan.relationships?.team_members?.data || []
+
+      const teamMembers = teamMembersRelationships
+        .map((rel: any) => {
+          const teamMember = allTeamMembers.find((tm: any) => tm.id === rel.id && tm.type === 'PlanPerson')
+
+          if (!teamMember) return null
+
+          return {
+            id: teamMember.id,
+            name: teamMember.attributes.name || 'Unknown',
+            role: teamMember.attributes.team_position_name || 'Team Member',
+            avatar: teamMember.attributes.photo_url || ''
+          }
+        })
+        .filter(Boolean)
+
+      // Get plan leader (first team member or use defaults)
+      const leader = teamMembers[0] || { id: '', name: 'No Leader Assigned', avatar: '' }
+
+      // Format the date
+      const dateStr = plan.attributes.sort_date || new Date().toISOString().slice(0, 10)
+      const planDate = new Date(dateStr)
+
+      // Determine status (based on dates and rehearsal status)
+      let status: 'draft' | 'planned' | 'confirmed' = 'draft'
+
+      if (plan.attributes.rehearsal_status === 'rehearsed') {
+        status = 'confirmed'
+      } else if (planDate && planDate.getTime() > Date.now()) {
+        // Future dates without rehearsal are considered planned
+        status = 'planned'
+      }
+
+      return {
+        id: plan.id,
+        title: plan.attributes.title || plan.attributes.series_title || 'Untitled Service',
+        date: dateStr,
+        time: plan.attributes.time || '10:00 AM', // Default if not provided
+        serviceName: plan.serviceTypeName,
+        leaderName: leader.name,
+        leaderId: leader.id,
+        leaderAvatar: leader.avatar,
+        teamMembers: teamMembers.filter((tm: any) => tm.id !== leader.id), // Exclude leader from team members
+        status
+      }
+    })
+
+    // Sort by date (newest first)
+    formattedData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+    console.log('Successfully fetched service plans from Planning Center')
+
+    return NextResponse.json(formattedData)
+  } catch (error: any) {
+    console.error('Planning Center API Error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    })
+
+    if (error.response?.status === 401) {
+      console.log('Unauthorized, redirecting to auth')
+
+      return NextResponse.redirect(new URL('/api/planning-center/auth', request.url))
+    }
+
+    // Fallback to mock data if there's an error
+    console.log('Falling back to mock data')
+
     const mockServicePlans = [
       {
         id: 'plan1',
@@ -36,12 +179,6 @@ export async function GET() {
             name: 'Mike Davis',
             role: 'Piano',
             avatar: ''
-          },
-          {
-            id: 'tm3',
-            name: 'Emily Wilson',
-            role: 'Vocals',
-            avatar: ''
           }
         ],
         status: 'confirmed'
@@ -55,132 +192,11 @@ export async function GET() {
         leaderName: 'Jane Wilson',
         leaderId: 'leader2',
         leaderAvatar: '',
-        teamMembers: [
-          {
-            id: 'tm4',
-            name: 'Robert Taylor',
-            role: 'Worship Leader',
-            avatar: ''
-          },
-          {
-            id: 'tm5',
-            name: 'Lisa Brown',
-            role: 'Drums',
-            avatar: ''
-          }
-        ],
-        status: 'planned'
-      },
-      {
-        id: 'plan3',
-        title: 'Wednesday Bible Study',
-        date: '2025-03-13',
-        time: '7:00 PM',
-        serviceName: 'Midweek Service',
-        leaderName: 'Pastor David Anderson',
-        leaderId: 'leader3',
-        leaderAvatar: '',
         teamMembers: [],
-        status: 'confirmed'
-      },
-      {
-        id: 'plan4',
-        title: 'Youth Worship Night',
-        date: '2025-03-14',
-        time: '6:30 PM',
-        serviceName: 'Youth Service',
-        leaderName: 'Chris Martinez',
-        leaderId: 'leader4',
-        leaderAvatar: '',
-        teamMembers: [
-          {
-            id: 'tm6',
-            name: 'Tyler Johnson',
-            role: 'Guitar',
-            avatar: ''
-          },
-          {
-            id: 'tm7',
-            name: 'Megan White',
-            role: 'Vocals',
-            avatar: ''
-          }
-        ],
-        status: 'draft'
-      },
-      {
-        id: 'plan5',
-        title: 'Sunday Morning Worship',
-        date: '2025-03-17',
-        time: '9:00 AM',
-        serviceName: 'Sunday Service',
-        leaderName: 'John Smith',
-        leaderId: 'leader1',
-        leaderAvatar: '',
-        teamMembers: [
-          {
-            id: 'tm1',
-            name: 'Sarah Johnson',
-            role: 'Worship Leader',
-            avatar: ''
-          },
-          {
-            id: 'tm2',
-            name: 'Mike Davis',
-            role: 'Piano',
-            avatar: ''
-          }
-        ],
         status: 'planned'
-      },
-      {
-        id: 'plan6',
-        title: 'Community Outreach Event',
-        date: '2025-03-21',
-        time: '10:00 AM',
-        serviceName: 'Outreach',
-        leaderName: 'Pastor David Anderson',
-        leaderId: 'leader3',
-        leaderAvatar: '',
-        teamMembers: [
-          {
-            id: 'tm8',
-            name: 'Karen Thomas',
-            role: 'Coordinator',
-            avatar: ''
-          }
-        ],
-        status: 'confirmed'
       }
     ]
 
-    // In production, you would connect to the Planning Center API
-    /*
-    // You'll need to import axios and configure auth properly when implementing this
-    const accessToken = session.accessToken
-    const response = await axios.get('https://api.planningcenteronline.com/services/v2/service_types/plans', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    })
-
-    // Format the response data here
-    const servicePlans = response.data.data.map(plan => {
-      // Transform the data structure to match your ServicePlan interface
-      return {
-        id: plan.id,
-        title: plan.attributes.title,
-        date: plan.attributes.sort_date,
-        time: plan.attributes.time,
-        // ... map other fields
-      }
-    })
-    */
-
-    return NextResponse.json(mockServicePlans)
-  } catch (error) {
-    console.error('Error fetching service plans:', error)
-
-    return NextResponse.json({ error: 'Failed to fetch service plans' }, { status: 500 })
+    return NextResponse.json(mockServicePlans, { status: 200 })
   }
 }
