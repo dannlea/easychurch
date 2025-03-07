@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react'
 
 // MUI Imports
-import { useRouter } from 'next/navigation'
+// Comment out useRouter since we're not using it now but may need it later
+// import { useRouter } from 'next/navigation'
 
 import Typography from '@mui/material/Typography'
 import Card from '@mui/material/Card'
@@ -45,7 +46,7 @@ interface TeamMember {
   avatar: string
 }
 
-// Add local mock data constant at the top, outside the component
+// Update the local mock data with more variety
 const LOCAL_MOCK_SERVICE_PLANS: ServicePlan[] = [
   {
     id: 'local-plan1',
@@ -83,6 +84,25 @@ const LOCAL_MOCK_SERVICE_PLANS: ServicePlan[] = [
     leaderAvatar: '',
     teamMembers: [],
     status: 'planned'
+  },
+  {
+    id: 'local-plan3',
+    title: 'Wednesday Bible Study (Local Mock)',
+    date: '2025-03-13',
+    time: '7:00 PM',
+    serviceName: 'Midweek Service',
+    leaderName: 'Pastor David Anderson',
+    leaderId: 'leader3',
+    leaderAvatar: '',
+    teamMembers: [
+      {
+        id: 'tm3',
+        name: 'Jennifer Smith',
+        role: 'Coordinator',
+        avatar: ''
+      }
+    ],
+    status: 'draft'
   }
 ]
 
@@ -104,13 +124,29 @@ const ServicePlansTable = () => {
   const [error, setError] = useState<string | null>(null)
   const [selectedServiceType, setSelectedServiceType] = useState('all')
   const [plansReceived, setPlansReceived] = useState<number>(0)
-  const router = useRouter()
+
+  // Keep router available for future use but comment out to avoid linter errors
+  // const router = useRouter()
 
   useEffect(() => {
     const fetchServicePlans = async () => {
       try {
         setLoading(true)
         setError(null)
+
+        // Detect if there are known SSL issues from previous errors
+        const hasSSLIssues = localStorage.getItem('service_plans_ssl_issues') === 'true'
+
+        // If we already know there are SSL issues, skip the network request entirely
+        if (hasSSLIssues) {
+          console.log('Known SSL issues detected, using local mock data without API call')
+          setServicePlans(LOCAL_MOCK_SERVICE_PLANS)
+          setFilteredPlans(LOCAL_MOCK_SERVICE_PLANS)
+          setError('Using local mock data due to previous SSL issues. Try refreshing later.')
+          setLoading(false)
+
+          return
+        }
 
         console.log('Fetching service plans from API...')
 
@@ -141,27 +177,49 @@ const ServicePlansTable = () => {
                 `Using mock data: ${errorMessage || 'Connection issues with Planning Center'}. Some features may be limited.`
               )
             }
+
+            // Clear any stored SSL issues since the request worked
+            localStorage.removeItem('service_plans_ssl_issues')
           } else {
             throw new Error('Invalid data format received')
           }
         } catch (initialErr: any) {
           console.error('Initial fetch error:', initialErr)
 
-          // If we get here, we have network issues or other errors that prevent us from
-          // even reaching our own API. Fall back to local mock data immediately.
-          console.log('Network issues detected, using local mock data without API call')
+          // Check for SSL or network errors
+          const isSSLError =
+            initialErr.code === 'ERR_NETWORK' ||
+            initialErr.message?.includes('Network Error') ||
+            initialErr.message?.includes('SSL')
 
+          // If SSL error, mark it in localStorage for future page loads
+          if (isSSLError) {
+            localStorage.setItem('service_plans_ssl_issues', 'true')
+            console.log('SSL/Network issues detected, using local mock data without API call')
+          }
+
+          // Use local data for any error
           setServicePlans(LOCAL_MOCK_SERVICE_PLANS)
           setFilteredPlans(LOCAL_MOCK_SERVICE_PLANS)
-          setError(
-            'Using local mock data due to connection issues. Check your network connection or Planning Center may be unavailable.'
-          )
+
+          // Different error messages based on error type
+          if (isSSLError) {
+            setError(
+              'Using local mock data due to connection issues. Check your network connection or SSL configuration.'
+            )
+          } else if (initialErr.response?.status === 401) {
+            setError('Using local mock data because authentication is required. You can try refreshing later.')
+
+            // NO redirect to auth here - this prevents the SSL error on the auth endpoint
+          } else {
+            setError(`Using local mock data due to API error: ${initialErr.message || 'Unknown error'}`)
+          }
 
           // Log the specific error for debugging
           if (initialErr.response?.status === 401) {
             console.log('Authentication error with Planning Center')
-          } else if (initialErr.code === 'ERR_NETWORK' || initialErr.message?.includes('Network Error')) {
-            console.log('Network connectivity issues detected')
+          } else if (isSSLError) {
+            console.log('SSL/Network connectivity issues detected')
           } else {
             console.log('Other error:', initialErr.message)
           }
@@ -179,7 +237,7 @@ const ServicePlansTable = () => {
     }
 
     fetchServicePlans()
-  }, [router])
+  }, []) // Removed router from dependencies to prevent redirects
 
   useEffect(() => {
     const fetchProgress = async () => {
