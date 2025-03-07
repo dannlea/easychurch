@@ -56,6 +56,66 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString(undefined, options)
 }
 
+// Add a simple mock data const for fallback
+const MOCK_SERVICE_PLANS: ServicePlan[] = [
+  {
+    id: 'mock1',
+    title: 'Sunday Morning Worship (Mock)',
+    date: '2025-03-10',
+    time: '9:00 AM',
+    serviceName: 'Sunday Service',
+    leaderName: 'John Smith',
+    leaderId: 'leader1',
+    leaderAvatar: '',
+    teamMembers: [
+      {
+        id: 'tm1',
+        name: 'Sarah Johnson',
+        role: 'Worship Leader',
+        avatar: ''
+      },
+      {
+        id: 'tm2',
+        name: 'Mike Davis',
+        role: 'Piano',
+        avatar: ''
+      }
+    ],
+    status: 'confirmed'
+  },
+  {
+    id: 'mock2',
+    title: 'Sunday Evening Worship (Mock)',
+    date: '2025-03-10',
+    time: '6:00 PM',
+    serviceName: 'Evening Service',
+    leaderName: 'Jane Wilson',
+    leaderId: 'leader2',
+    leaderAvatar: '',
+    teamMembers: [],
+    status: 'planned'
+  },
+  {
+    id: 'mock3',
+    title: 'Wednesday Bible Study (Mock)',
+    date: '2025-03-13',
+    time: '7:00 PM',
+    serviceName: 'Midweek Service',
+    leaderName: 'Pastor David Anderson',
+    leaderId: 'leader3',
+    leaderAvatar: '',
+    teamMembers: [
+      {
+        id: 'tm3',
+        name: 'Jennifer Smith',
+        role: 'Coordinator',
+        avatar: ''
+      }
+    ],
+    status: 'draft'
+  }
+]
+
 const ServicePlansTable = () => {
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([])
   const [filteredPlans, setFilteredPlans] = useState<ServicePlan[]>([])
@@ -78,8 +138,18 @@ const ServicePlansTable = () => {
         setFilteredPlans(data)
       } catch (err: any) {
         console.error('Fetch error:', err)
-        setError('Failed to fetch service plans from Planning Center')
-        router.push('/api/planning-center/auth')
+
+        // If we have a network error, use mock data instead of redirecting
+        if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+          console.log('Network error, using mock data')
+          setServicePlans(MOCK_SERVICE_PLANS)
+          setFilteredPlans(MOCK_SERVICE_PLANS)
+          setError('Using mock data due to network issues. Some features may be limited.')
+        } else {
+          // For other errors like authentication, redirect to auth
+          setError('Failed to fetch service plans from Planning Center')
+          router.push('/api/planning-center/auth')
+        }
       } finally {
         setLoading(false)
       }
