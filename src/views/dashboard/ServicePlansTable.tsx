@@ -69,23 +69,35 @@ const ServicePlansTable = () => {
     const fetchServicePlans = async () => {
       try {
         setLoading(true)
+        setError(null)
 
-        const response = await axios.get('/api/planning-center/service-plans', {
-          headers: {
-            Authorization: `Bearer YOUR_ACCESS_TOKEN`
-          }
-        })
+        console.log('Fetching service plans from API...')
+        const response = await axios.get('/api/planning-center/service-plans')
 
         const data = response.data
 
         console.log('API Response:', data)
 
-        setServicePlans(data)
-        setFilteredPlans(data)
+        if (data && Array.isArray(data)) {
+          setServicePlans(data)
+          setFilteredPlans(data)
+        } else {
+          console.error('Invalid data format:', data)
+          setError('Invalid data format received')
+        }
       } catch (err: any) {
         console.error('Fetch error:', err)
-        setError('Failed to fetch service plans from Planning Center')
-        router.push('/api/planning-center/auth')
+
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          console.log('Authentication required, redirecting...')
+          setError('Authentication required. Redirecting to login...')
+
+          setTimeout(() => {
+            router.push('/api/planning-center/auth')
+          }, 2000)
+        } else {
+          setError('Failed to fetch service plans from Planning Center')
+        }
       } finally {
         setLoading(false)
       }

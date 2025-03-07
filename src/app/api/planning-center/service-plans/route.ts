@@ -29,6 +29,8 @@ export async function GET(request: Request) {
     console.log('Using Access Token:', accessToken)
 
     // Get all service types first
+    console.log('Fetching service types from:', `${BASE_URL}/service_types`)
+
     const serviceTypesResponse = await axios.get(`${BASE_URL}/service_types`, {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -38,7 +40,10 @@ export async function GET(request: Request) {
 
     const serviceTypes = serviceTypesResponse.data.data
 
-    console.log(`Found ${serviceTypes.length} service types`)
+    console.log(
+      `Found ${serviceTypes.length} service types:`,
+      serviceTypes.map((st: any) => st.attributes.name)
+    )
 
     // Now get plans for each service type
     let allPlans: any[] = []
