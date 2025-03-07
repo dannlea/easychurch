@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from 'react'
 
 // MUI Imports
-// Comment out useRouter since we're not using it now but may need it later
-// import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 import Typography from '@mui/material/Typography'
 import Card from '@mui/material/Card'
@@ -46,66 +45,6 @@ interface TeamMember {
   avatar: string
 }
 
-// Update the local mock data with more variety
-const LOCAL_MOCK_SERVICE_PLANS: ServicePlan[] = [
-  {
-    id: 'local-plan1',
-    title: 'Sunday Morning Worship (Local Mock)',
-    date: '2025-03-10',
-    time: '9:00 AM',
-    serviceName: 'Sunday Service',
-    leaderName: 'John Smith',
-    leaderId: 'leader1',
-    leaderAvatar: '',
-    teamMembers: [
-      {
-        id: 'tm1',
-        name: 'Sarah Johnson',
-        role: 'Worship Leader',
-        avatar: ''
-      },
-      {
-        id: 'tm2',
-        name: 'Mike Davis',
-        role: 'Piano',
-        avatar: ''
-      }
-    ],
-    status: 'confirmed'
-  },
-  {
-    id: 'local-plan2',
-    title: 'Sunday Evening Worship (Local Mock)',
-    date: '2025-03-10',
-    time: '6:00 PM',
-    serviceName: 'Evening Service',
-    leaderName: 'Jane Wilson',
-    leaderId: 'leader2',
-    leaderAvatar: '',
-    teamMembers: [],
-    status: 'planned'
-  },
-  {
-    id: 'local-plan3',
-    title: 'Wednesday Bible Study (Local Mock)',
-    date: '2025-03-13',
-    time: '7:00 PM',
-    serviceName: 'Midweek Service',
-    leaderName: 'Pastor David Anderson',
-    leaderId: 'leader3',
-    leaderAvatar: '',
-    teamMembers: [
-      {
-        id: 'tm3',
-        name: 'Jennifer Smith',
-        role: 'Coordinator',
-        avatar: ''
-      }
-    ],
-    status: 'draft'
-  }
-]
-
 const formatDate = (dateString: string) => {
   const options: Intl.DateTimeFormatOptions = {
     weekday: 'long',
@@ -123,155 +62,31 @@ const ServicePlansTable = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedServiceType, setSelectedServiceType] = useState('all')
-  const [plansReceived, setPlansReceived] = useState<number>(0)
-
-  // Keep router available for future use but comment out to avoid linter errors
-  // const router = useRouter()
+  const router = useRouter()
 
   useEffect(() => {
     const fetchServicePlans = async () => {
       try {
         setLoading(true)
-        setError(null)
 
-        // Detect if there are known SSL issues from previous errors
-        const hasSSLIssues = localStorage.getItem('service_plans_ssl_issues') === 'true'
+        const response = await axios.get('/api/planning-center/service-plans')
+        const data = response.data
 
-        // If we already know there are SSL issues, skip the network request entirely
-        if (hasSSLIssues) {
-          console.log('Known SSL issues detected, using local mock data without API call')
-          setServicePlans(LOCAL_MOCK_SERVICE_PLANS)
-          setFilteredPlans(LOCAL_MOCK_SERVICE_PLANS)
-          setError('Using local mock data due to previous SSL issues. Try refreshing later.')
-          setLoading(false)
+        console.log('API Response:', data)
 
-          return
-        }
-
-        console.log('Fetching service plans from API...')
-
-        // Try with a very short timeout first to quickly detect network issues
-        try {
-          const response = await axios.get('/api/planning-center/service-plans', {
-            timeout: 5000, // Short timeout to fail fast if there are network issues
-            validateStatus: status => status < 500 // Accept any status less than 500
-          })
-
-          // Check headers for mock data flag
-          const usingMockData = response.headers['x-using-mock-data'] === 'true'
-          const errorMessage = response.headers['x-error-message'] || response.headers['x-error-reason']
-
-          const data = response.data
-
-          console.log('API Response:', data)
-
-          if (data && Array.isArray(data)) {
-            // Also check the data itself for mock indicators
-            const isMockData = usingMockData || (data.length > 0 && data[0].title && data[0].title.includes('Mock'))
-
-            setServicePlans(data)
-            setFilteredPlans(data)
-
-            if (isMockData) {
-              setError(
-                `Using mock data: ${errorMessage || 'Connection issues with Planning Center'}. Some features may be limited.`
-              )
-            }
-
-            // Clear any stored SSL issues since the request worked
-            localStorage.removeItem('service_plans_ssl_issues')
-          } else {
-            throw new Error('Invalid data format received')
-          }
-        } catch (initialErr: any) {
-          console.error('Initial fetch error:', initialErr)
-
-          // Check for SSL or network errors
-          const isSSLError =
-            initialErr.code === 'ERR_NETWORK' ||
-            initialErr.message?.includes('Network Error') ||
-            initialErr.message?.includes('SSL')
-
-          // If SSL error, mark it in localStorage for future page loads
-          if (isSSLError) {
-            localStorage.setItem('service_plans_ssl_issues', 'true')
-            console.log('SSL/Network issues detected, using local mock data without API call')
-          }
-
-          // Use local data for any error
-          setServicePlans(LOCAL_MOCK_SERVICE_PLANS)
-          setFilteredPlans(LOCAL_MOCK_SERVICE_PLANS)
-
-          // Different error messages based on error type
-          if (isSSLError) {
-            setError(
-              'Using local mock data due to connection issues. Check your network connection or SSL configuration.'
-            )
-          } else if (initialErr.response?.status === 401) {
-            setError('Using local mock data because authentication is required. You can try refreshing later.')
-
-            // NO redirect to auth here - this prevents the SSL error on the auth endpoint
-          } else {
-            setError(`Using local mock data due to API error: ${initialErr.message || 'Unknown error'}`)
-          }
-
-          // Log the specific error for debugging
-          if (initialErr.response?.status === 401) {
-            console.log('Authentication error with Planning Center')
-          } else if (isSSLError) {
-            console.log('SSL/Network connectivity issues detected')
-          } else {
-            console.log('Other error:', initialErr.message)
-          }
-        }
+        setServicePlans(data)
+        setFilteredPlans(data)
       } catch (err: any) {
-        console.error('Final fetch error:', err)
-
-        // Final fallback if something unexpected happens
-        setServicePlans(LOCAL_MOCK_SERVICE_PLANS)
-        setFilteredPlans(LOCAL_MOCK_SERVICE_PLANS)
-        setError(`Using local mock data. ${err.message || 'Unknown error'}. Please try again later.`)
+        console.error('Fetch error:', err)
+        setError('Failed to fetch service plans from Planning Center')
+        router.push('/api/planning-center/auth')
       } finally {
         setLoading(false)
       }
     }
 
     fetchServicePlans()
-  }, []) // Removed router from dependencies to prevent redirects
-
-  useEffect(() => {
-    const fetchProgress = async () => {
-      try {
-        // Only poll for progress if we're still loading
-        if (!loading) {
-          return
-        }
-
-        const response = await axios.get('/api/planning-center/service-plans?progress', {
-          timeout: 3000 // Shorter timeout for progress requests
-        })
-
-        setPlansReceived(response.data.progress)
-      } catch (err) {
-        console.error('Error fetching progress:', err)
-
-        // No need to show error for progress polling
-      }
-    }
-
-    // Only start polling if we're loading
-    let intervalId: NodeJS.Timeout | null = null
-
-    if (loading) {
-      intervalId = setInterval(fetchProgress, 1000) // Poll every second
-    }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId) // Cleanup on unmount or when loading changes
-      }
-    }
-  }, [loading])
+  }, [router])
 
   useEffect(() => {
     if (selectedServiceType === 'all') {
@@ -440,8 +255,6 @@ const ServicePlansTable = () => {
       // Small delay to ensure everything is rendered properly
       setTimeout(() => {
         printWindow.print()
-
-        // printWindow.close() // Optional: close after printing
       }, 300)
     }
   }
@@ -520,7 +333,7 @@ const ServicePlansTable = () => {
                   <tr>
                     <td colSpan={6}>
                       <Typography align='center' className='animate-pulse italic'>
-                        Loading service plans... {plansReceived > 0 ? `${plansReceived} plans received` : ''}
+                        Loading service plans...
                       </Typography>
                     </td>
                   </tr>
