@@ -27,6 +27,9 @@ import MusicNoteIcon from '@mui/icons-material/MusicNote'
 import GroupIcon from '@mui/icons-material/Group'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import FolderIcon from '@mui/icons-material/Folder'
+import AccountCircleIcon from '@mui/icons-material/AccountCircle'
+import MicIcon from '@mui/icons-material/Mic'
+import AccessTimeIcon from '@mui/icons-material/AccessTime'
 
 // Third-party Imports
 import axios from 'axios'
@@ -41,7 +44,7 @@ interface ServicePlan {
     planningCenter: string
     formatted: string
   }
-  status: string
+  status?: string
   formattedTimes: string | null
   planTimes: {
     id: string
@@ -65,9 +68,22 @@ interface ServicePlan {
       id: string
       name: string
       position: string
+      personId: string | null
+      personName: string
       status: string
     }[]
   }[]
+  keyPeople: {
+    id: string
+    name: string
+    position: string
+    teamName: string
+    personId: string | null
+    personName: string
+    status: string
+  }[]
+  series?: string
+  seriesTitle?: string
   createdAt: string
   updatedAt: string
   totalItems: number
@@ -77,19 +93,6 @@ interface ServicePlan {
 interface ServiceType {
   id: string
   name: string
-}
-
-const getStatusColor = (status: string) => {
-  switch (status.toLowerCase()) {
-    case 'confirmed':
-      return 'success'
-    case 'unconfirmed':
-      return 'warning'
-    case 'draft':
-      return 'info'
-    default:
-      return 'default'
-  }
 }
 
 const ServicePlansTable = () => {
@@ -244,6 +247,7 @@ const ServicePlansTable = () => {
                     </Typography>
                     <Typography variant='body2' color='text.secondary'>
                       {plan.serviceTypeName}
+                      {plan.seriesTitle && <span> • {plan.seriesTitle}</span>}
                     </Typography>
                   </Grid>
                   <Grid item xs={12} md={4}>
@@ -252,13 +256,19 @@ const ServicePlansTable = () => {
                       <Typography variant='body2'>{plan.dates.formatted}</Typography>
                     </Box>
                     {plan.formattedTimes ? (
-                      <Typography variant='body2' color='text.secondary'>
-                        {plan.formattedTimes}
-                      </Typography>
+                      <Box display='flex' alignItems='center'>
+                        <AccessTimeIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1rem' }} />
+                        <Typography variant='body2' color='text.secondary'>
+                          {plan.formattedTimes}
+                        </Typography>
+                      </Box>
                     ) : plan.planTimes.length > 0 ? (
-                      <Typography variant='body2' color='text.secondary'>
-                        {plan.planTimes.map(time => time.timeFormatted).join(' & ')}
-                      </Typography>
+                      <Box display='flex' alignItems='center'>
+                        <AccessTimeIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1rem' }} />
+                        <Typography variant='body2' color='text.secondary'>
+                          {plan.planTimes.map(time => time.timeFormatted).join(' & ')}
+                        </Typography>
+                      </Box>
                     ) : (
                       <Typography variant='body2' color='text.secondary' sx={{ fontStyle: 'italic' }}>
                         No times scheduled
@@ -266,13 +276,35 @@ const ServicePlansTable = () => {
                     )}
                   </Grid>
                   <Grid item xs={12} md={4} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                    <Chip label={plan.status} color={getStatusColor(plan.status) as any} size='small' sx={{ mr: 2 }} />
+                    <Box sx={{ display: 'flex', flexGrow: 1, flexWrap: 'wrap', gap: 1, justifyContent: 'flex-end' }}>
+                      {plan.keyPeople && plan.keyPeople.length > 0
+                        ? plan.keyPeople.slice(0, 3).map(person => (
+                            <Chip
+                              key={person.id}
+                              icon={<MicIcon />}
+                              label={`${person.personName}: ${person.position}`}
+                              size='small'
+                              color='default'
+                              sx={{
+                                fontWeight: person.position.toLowerCase().includes('worship') ? 'bold' : 'normal',
+                                maxWidth: 200,
+                                '& .MuiChip-label': {
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }
+                              }}
+                            />
+                          ))
+                        : null}
+                    </Box>
+
                     <IconButton
                       component='a'
                       href={plan.planningCenterUrl}
                       target='_blank'
                       size='small'
-                      sx={{ color: 'primary.main' }}
+                      sx={{ color: 'primary.main', ml: 1 }}
                     >
                       <OpenInNewIcon />
                     </IconButton>
@@ -281,7 +313,52 @@ const ServicePlansTable = () => {
               </AccordionSummary>
               <AccordionDetails>
                 <Grid container spacing={3}>
-                  {/* Songs Section */}
+                  {plan.keyPeople && plan.keyPeople.length > 0 && (
+                    <Grid item xs={12}>
+                      <Typography variant='subtitle1' gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                        <AccountCircleIcon sx={{ mr: 1 }} /> Key People
+                      </Typography>
+                      <Box component='ul' sx={{ pl: 2, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                        {plan.keyPeople.map(person => (
+                          <Box
+                            component='li'
+                            key={person.id}
+                            sx={{
+                              mb: 1,
+                              width: 'calc(50% - 16px)',
+                              minWidth: '200px',
+                              '& .MuiTypography-root': {
+                                mb: 0
+                              }
+                            }}
+                          >
+                            <Typography variant='body2' fontWeight='bold'>
+                              {person.personName}
+                              <Chip
+                                label={person.position}
+                                size='small'
+                                color='primary'
+                                variant='outlined'
+                                sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
+                              />
+                            </Typography>
+                            <Typography variant='caption' color='text.secondary'>
+                              {person.teamName}
+                              {person.status && person.status !== 'unknown' && (
+                                <Chip
+                                  label={person.status}
+                                  size='small'
+                                  color={person.status === 'confirmed' ? 'success' : 'warning'}
+                                  sx={{ ml: 1, height: 16, fontSize: '0.6rem' }}
+                                />
+                              )}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Grid>
+                  )}
+
                   <Grid item xs={12} md={6}>
                     <Typography variant='subtitle1' gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                       <MusicNoteIcon sx={{ mr: 1 }} /> Songs
@@ -306,7 +383,6 @@ const ServicePlansTable = () => {
                     )}
                   </Grid>
 
-                  {/* Teams Section */}
                   <Grid item xs={12} md={6}>
                     <Typography variant='subtitle1' gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                       <GroupIcon sx={{ mr: 1 }} /> Teams
@@ -322,13 +398,16 @@ const ServicePlansTable = () => {
                               {team.members.map(member => (
                                 <Box component='li' key={member.id}>
                                   <Typography variant='body2'>
-                                    {member.name} - <span style={{ fontStyle: 'italic' }}>{member.position}</span>
-                                    <Chip
-                                      label={member.status}
-                                      size='small'
-                                      color={member.status === 'confirmed' ? 'success' : 'warning'}
-                                      sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
-                                    />
+                                    {member.personName || member.name} -{' '}
+                                    <span style={{ fontStyle: 'italic' }}>{member.position}</span>
+                                    {member.status && member.status !== 'unknown' && (
+                                      <Chip
+                                        label={member.status}
+                                        size='small'
+                                        color={member.status === 'confirmed' ? 'success' : 'warning'}
+                                        sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
+                                      />
+                                    )}
                                   </Typography>
                                 </Box>
                               ))}
