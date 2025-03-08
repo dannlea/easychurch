@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 
-import { cookies } from 'next/headers'
-
 import axios from 'axios'
+
+// Utilities
+import { validateToken } from '../utils/tokenUtils'
 
 // Mark this route as dynamic to fix the deployment error
 export const dynamic = 'force-dynamic'
@@ -13,16 +14,16 @@ let progress = 0 // Track progress
 
 export async function GET(request: Request) {
   try {
-    // Retrieve the access token from the cookie
-    const accessToken = cookies().get('access_token')?.value
+    // Validate and potentially refresh the token
+    const { token, needsAuth } = await validateToken()
 
-    if (!accessToken) {
-      console.log('No access token found, redirecting to auth')
+    if (needsAuth) {
+      console.log('Token validation failed, redirecting to auth')
 
       return NextResponse.redirect(new URL('/api/planning-center/auth', request.url))
     }
 
-    console.log('Using Access Token:', accessToken) // Log the access token
+    console.log('Using Access Token:', token) // Log the access token
 
     if (request.url.includes('progress')) {
       return NextResponse.json({ progress })
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
     while (nextPage) {
       const response = await axios.get(nextPage, {
         headers: {
-          Authorization: `Bearer ${accessToken}`
+          Authorization: `Bearer ${token}`
         },
         timeout: 10000 // Set a timeout of 10 seconds
       })
