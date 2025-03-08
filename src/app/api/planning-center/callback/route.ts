@@ -9,13 +9,6 @@ export const dynamic = 'force-dynamic'
 const CLIENT_ID = process.env.PC_CLIENT_ID
 const CLIENT_SECRET = process.env.PC_CLIENT_SECRET
 
-// Default values from environment
-const DEFAULT_REDIRECT_URI = process.env.PC_REDIRECT_URI
-
-/*console.log("Client ID:", CLIENT_ID);
-console.log("Client Secret:", CLIENT_SECRET ? "Exists" : "Missing");
-console.log("Redirect URI:", REDIRECT_URI);*/
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -24,45 +17,41 @@ export async function GET(request: Request) {
     if (!code) {
       console.log('No authorization code found')
 
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect('/login')
     }
 
-    // Get headers to check for forwarded host
+    // Get host information from headers
     const headersList = headers()
-    const xForwardedHost = headersList.get('x-forwarded-host')
-    const xForwardedProto = headersList.get('x-forwarded-proto') || 'https'
+    const forwardedHost = headersList.get('x-forwarded-host')
+    const forwardedProto = headersList.get('x-forwarded-proto') || 'https'
     const host = headersList.get('host')
 
-    // Determine the actual host, prioritizing forwarded headers for proxies like ngrok
-    let actualHost: string
+    // Determine base URL
+    let baseUrl
 
-    if (xForwardedHost) {
-      // Use forwarded host (e.g., from ngrok)
-      actualHost = `${xForwardedProto}://${xForwardedHost}`
-      console.log('Using forwarded host for callback:', actualHost)
+    if (forwardedHost) {
+      baseUrl = `${forwardedProto}://${forwardedHost}`
+      console.log('Callback using forwarded host:', baseUrl)
     } else if (host) {
-      // Fall back to the regular host header
-      actualHost = `https://${host}`
-      console.log('Using host header for callback:', actualHost)
+      baseUrl = `https://${host}`
+      console.log('Callback using host header:', baseUrl)
     } else {
-      // Last resort - parse from request URL
-      const requestUrl = new URL(request.url)
+      const reqUrl = new URL(request.url)
 
-      actualHost = requestUrl.origin
-      console.log('Using request URL origin for callback:', actualHost)
+      baseUrl = reqUrl.origin
+      console.log('Callback using request URL origin:', baseUrl)
     }
 
-    // Build a dynamic redirect URI based on the detected host
-    const dynamicRedirectUri = `${actualHost}/api/planning-center/callback`
-    const redirectUri = dynamicRedirectUri || DEFAULT_REDIRECT_URI || ''
+    // Create callback URL using the same host
+    const callbackUrl = `${baseUrl}/api/planning-center/callback`
 
-    console.log('Using redirect URI for token exchange:', redirectUri)
+    console.log('Using redirect URI for token exchange:', callbackUrl)
 
     // Exchange the authorization code for an access token
     const tokenResponse = await axios.post('https://api.planningcenteronline.com/oauth/token', {
       grant_type: 'authorization_code',
       code,
-      redirect_uri: redirectUri,
+      redirect_uri: callbackUrl,
       client_id: CLIENT_ID,
       client_secret: CLIENT_SECRET
     })
@@ -77,21 +66,21 @@ export async function GET(request: Request) {
 
     console.log('Access token received and stored')
 
-    // Use the same host for the redirect back to the application
-    return NextResponse.redirect(`${actualHost}/service-plans`)
+    // Redirect to the service plans page using the same host
+    return NextResponse.redirect(`${baseUrl}/service-plans`)
   } catch (error: any) {
     console.error('Error during token exchange:', error)
 
     // Get host for error redirect
     const headersList = headers()
-    const xForwardedHost = headersList.get('x-forwarded-host')
-    const xForwardedProto = headersList.get('x-forwarded-proto') || 'https'
+    const forwardedHost = headersList.get('x-forwarded-host')
+    const forwardedProto = headersList.get('x-forwarded-proto') || 'https'
     const host = headersList.get('host')
 
     let baseUrl = 'https://localhost:3000'
 
-    if (xForwardedHost) {
-      baseUrl = `${xForwardedProto}://${xForwardedHost}`
+    if (forwardedHost) {
+      baseUrl = `${forwardedProto}://${forwardedHost}`
     } else if (host) {
       baseUrl = `https://${host}`
     }

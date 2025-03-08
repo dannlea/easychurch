@@ -23,152 +23,120 @@ export async function GET(request: Request) {
     if (!accessToken) {
       console.log('No access token found, redirecting to auth')
 
-      // Get headers to check for forwarded host
+      // Get the ngrok or current host
+      const reqUrl = new URL(request.url)
       const headersList = headers()
-      const xForwardedHost = headersList.get('x-forwarded-host')
-      const xForwardedProto = headersList.get('x-forwarded-proto') || 'https'
-      const host = headersList.get('host')
+      const forwardedHost = headersList.get('x-forwarded-host')
+      const forwardedProto = headersList.get('x-forwarded-proto') || 'https'
 
-      // Determine the actual host
-      let actualHost: string
+      let baseUrl
 
-      if (xForwardedHost) {
-        actualHost = `${xForwardedProto}://${xForwardedHost}`
-        console.log('Using forwarded host for auth redirect:', actualHost)
-      } else if (host) {
-        actualHost = `https://${host}`
-        console.log('Using host header for auth redirect:', actualHost)
+      if (forwardedHost) {
+        baseUrl = `${forwardedProto}://${forwardedHost}`
+        console.log('Using forwarded host:', baseUrl)
       } else {
-        const requestUrl = new URL(request.url)
-
-        actualHost = requestUrl.origin
-        console.log('Using request URL origin for auth redirect:', actualHost)
+        baseUrl = reqUrl.origin
+        console.log('Using request origin:', baseUrl)
       }
 
-      // Create auth URL with the correct host
-      const authUrl = new URL('/api/planning-center/auth', actualHost)
+      // Use an absolute URL with the correct host
+      const authUrl = `${baseUrl}/api/planning-center/auth`
+
+      console.log('Redirecting to:', authUrl)
 
       return NextResponse.redirect(authUrl)
     }
 
-    console.log('Using Access Token:', accessToken)
+    console.log('Using Access Token:', accessToken) // Log the access token
 
-    // Get all service types first
-    console.log('Fetching service types from:', `${BASE_URL}/service_types`)
+    let allPeopleData: any[] = []
+    let allIncludedData: any[] = [] // Initialize an array to collect all included data
+    let nextPage = `${BASE_URL}/series`
 
-    const serviceTypesResponse = await axios.get(`${BASE_URL}/service_types`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      },
-      timeout: 10000 // Same timeout as People API
-    })
+    while (nextPage) {
+      const response = await axios.get(nextPage, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        },
+        timeout: 10000 // Set a timeout of 10 seconds
+      })
 
-    const serviceTypes = serviceTypesResponse.data.data
+      const peopleData = response.data.data
+      const includedData = response.data.included || [] // Collect included data
 
-    console.log(
-      `Found ${serviceTypes.length} service types:`,
-      serviceTypes.map((st: any) => st.attributes.name)
-    )
-
-    // Now get plans for each service type
-    let allPlans: any[] = []
-    let allTeamMembers: any[] = [] // Initialize array to collect team members data
-
-    for (const serviceType of serviceTypes) {
-      const serviceTypeId = serviceType.id
-      const serviceTypeName = serviceType.attributes.name
-
-      // Get plans for this service type
-      const plansUrl = `${BASE_URL}/service_types/${serviceTypeId}/plans?include=team_members&order=sort_date`
-
-      console.log(`Fetching plans for service type: ${serviceTypeName} from ${plansUrl}`)
-
-      let nextPage = plansUrl
-
-      while (nextPage) {
-        const plansResponse = await axios.get(nextPage, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          },
-          timeout: 10000 // Set a timeout of 10 seconds
-        })
-
-        const plansData = plansResponse.data.data || []
-        const includedData = plansResponse.data.included || []
-
-        if (plansData.length > 0) {
-          // Add service type name to each plan
-          const enrichedPlans = plansData.map((plan: any) => ({
-            ...plan,
-            serviceTypeName
-          }))
-
-          allPlans = [...allPlans, ...enrichedPlans]
-          allTeamMembers = [...allTeamMembers, ...includedData]
-          progress = allPlans.length // Update progress
-        }
-
-        nextPage = plansResponse.data.links?.next || null // Update nextPage with the next link
+      if (peopleData.length > 0) {
+        allPeopleData = [...allPeopleData, ...peopleData]
+        allIncludedData = [...allIncludedData, ...includedData] // Collect included data
+        progress = allPeopleData.length // Update progress
       }
+
+      nextPage = response.data.links.next || null // Update nextPage with the next link
     }
 
-    console.log(`Total plans fetched: ${allPlans.length}`)
+    const formattedData = allPeopleData.map((person: any) => {
+      const birthdateString = person.attributes.birthdate ?? null
+      const birthdate = birthdateString ? new Date(birthdateString) : null
 
-    // Format the plans data to match our interface
-    const formattedData = allPlans.map((plan: any) => {
-      // Get team members for this plan
-      const teamMembersRelationships = plan.relationships?.team_members?.data || []
+      const formattedBirthdate =
+        birthdate instanceof Date && !isNaN(birthdate.getTime()) ? birthdate.toLocaleDateString() : 'Unknown'
 
-      const teamMembers = teamMembersRelationships
-        .map((rel: any) => {
-          const teamMember = allTeamMembers.find((tm: any) => tm.id === rel.id && tm.type === 'PlanPerson')
+      let birthYear: number | null = null
+      let birthMonthDay: string | null = null
 
-          if (!teamMember) return null
-
-          return {
-            id: teamMember.id,
-            name: teamMember.attributes.name || 'Unknown',
-            role: teamMember.attributes.team_position_name || 'Team Member',
-            avatar: teamMember.attributes.photo_url || ''
-          }
-        })
-        .filter(Boolean)
-
-      // Get plan leader (first team member or use defaults)
-      const leader = teamMembers[0] || { id: '', name: 'No Leader Assigned', avatar: '' }
-
-      // Format the date
-      const dateStr = plan.attributes.sort_date || new Date().toISOString().slice(0, 10)
-      const planDate = new Date(dateStr)
-
-      // Determine status (based on dates and rehearsal status)
-      let status: 'draft' | 'planned' | 'confirmed' = 'draft'
-
-      if (plan.attributes.rehearsal_status === 'rehearsed') {
-        status = 'confirmed'
-      } else if (planDate && planDate.getTime() > Date.now()) {
-        // Future dates without rehearsal are considered planned
-        status = 'planned'
+      if (birthdate !== null) {
+        birthYear = birthdate.getFullYear()
+        birthMonthDay = birthdate.toISOString().slice(5, 10)
       }
 
+      const currentYear = new Date().getFullYear()
+      const currentMonthDay = new Date().toISOString().slice(5, 10)
+      const currentAge = birthYear !== null ? currentYear - birthYear : null
+
+      const ageNext =
+        birthYear !== null && birthMonthDay !== null && birthMonthDay > currentMonthDay
+          ? currentAge
+          : currentAge !== null
+            ? currentAge + 1
+            : null
+
+      // Find the address related to the person
+      const addressData = person.relationships.addresses.data[0]
+
+      const address = addressData
+        ? allIncludedData.find((item: any) => item.id === addressData.id && item.type === 'Address')
+        : null
+
+      const streetAddress = address
+        ? [
+            address.attributes.street_line_1,
+            address.attributes.street_line_2,
+            address.attributes.city,
+            address.attributes.state,
+            address.attributes.zip
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : 'No address'
+
+      // Find the email related to the person
+      const email = allIncludedData.find(
+        (item: any) => item.type === 'Email' && item.relationships.person.data.id === person.id
+      )
+
       return {
-        id: plan.id,
-        title: plan.attributes.title || plan.attributes.series_title || 'Untitled Service',
-        date: dateStr,
-        time: plan.attributes.time || '10:00 AM', // Default if not provided
-        serviceName: plan.serviceTypeName,
-        leaderName: leader.name,
-        leaderId: leader.id,
-        leaderAvatar: leader.avatar,
-        teamMembers: teamMembers.filter((tm: any) => tm.id !== leader.id), // Exclude leader from team members
-        status
+        id: person.id,
+        firstName: person.attributes.first_name,
+        lastName: person.attributes.last_name,
+        birthdate: formattedBirthdate,
+        ageNext,
+        address: streetAddress,
+        email: email ? email.attributes.address : 'No email',
+        gender: person.attributes.gender || 'Not specified',
+        profilePicture: person.attributes.avatar || 'No avatar'
       }
     })
 
-    // Sort by date (newest first)
-    formattedData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-    console.log('Successfully fetched service plans from Planning Center')
+    console.log('Successfully fetched data from Planning Center')
 
     return NextResponse.json(formattedData)
   } catch (error: any) {
@@ -181,36 +149,32 @@ export async function GET(request: Request) {
     if (error.response?.status === 401) {
       console.log('Unauthorized, redirecting to auth')
 
-      // Get headers to check for forwarded host
+      // Get the ngrok or current host
+      const reqUrl = new URL(request.url)
       const headersList = headers()
-      const xForwardedHost = headersList.get('x-forwarded-host')
-      const xForwardedProto = headersList.get('x-forwarded-proto') || 'https'
-      const host = headersList.get('host')
+      const forwardedHost = headersList.get('x-forwarded-host')
+      const forwardedProto = headersList.get('x-forwarded-proto') || 'https'
 
-      // Determine the actual host
-      let actualHost: string
+      let baseUrl
 
-      if (xForwardedHost) {
-        actualHost = `${xForwardedProto}://${xForwardedHost}`
-        console.log('Using forwarded host for auth redirect:', actualHost)
-      } else if (host) {
-        actualHost = `https://${host}`
-        console.log('Using host header for auth redirect:', actualHost)
+      if (forwardedHost) {
+        baseUrl = `${forwardedProto}://${forwardedHost}`
+        console.log('Using forwarded host for 401 redirect:', baseUrl)
       } else {
-        const requestUrl = new URL(request.url)
-
-        actualHost = requestUrl.origin
-        console.log('Using request URL origin for auth redirect:', actualHost)
+        baseUrl = reqUrl.origin
+        console.log('Using request origin for 401 redirect:', baseUrl)
       }
 
-      // Create auth URL with the correct host
-      const authUrl = new URL('/api/planning-center/auth', actualHost)
+      // Use an absolute URL with the correct host
+      const authUrl = `${baseUrl}/api/planning-center/auth`
+
+      console.log('Redirecting 401 to:', authUrl)
 
       return NextResponse.redirect(authUrl)
     }
 
     return NextResponse.json(
-      { error: 'Failed to fetch service plans from Planning Center' },
+      { error: 'Failed to fetch data from Planning Center' },
       { status: error.response?.status || 500 }
     )
   }
