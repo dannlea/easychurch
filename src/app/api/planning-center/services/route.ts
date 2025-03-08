@@ -47,16 +47,16 @@ function debugResponse(response: any, label: string) {
 }
 
 // Extract team positions we want to highlight
-function extractImportantPositions(plan: any, includedData: any[]) {
+function extractImportantPositions(plan: any, allIncludedData: any[]) {
   try {
     const keyPeople: any[] = []
     const teamPositionsToHighlight = ['worship leader', 'speaker', 'worship director', 'host', 'leader', 'teacher']
 
-    // First, find all team members
-    const allTeamMembers = includedData.filter(item => item.type === 'TeamMember')
+    // Use directly fetched team members if available
+    const teamMembers = plan._teamMembers || []
 
     // Process each team member
-    allTeamMembers.forEach(member => {
+    teamMembers.forEach((member: any) => {
       // Get the position name
       const positionName = member.attributes.team_position_name?.toLowerCase() || ''
 
@@ -69,7 +69,7 @@ function extractImportantPositions(plan: any, includedData: any[]) {
         let personData = null
 
         if (personId) {
-          personData = includedData.find(item => item.type === 'Person' && item.id === personId)
+          personData = allIncludedData.find(item => item.type === 'Person' && item.id === personId)
         }
 
         // Find the team data
@@ -77,7 +77,7 @@ function extractImportantPositions(plan: any, includedData: any[]) {
         let teamData = null
 
         if (teamId) {
-          teamData = includedData.find(item => item.type === 'Team' && item.id === teamId)
+          teamData = allIncludedData.find(item => item.type === 'Team' && item.id === teamId)
         }
 
         // Add to key people list
@@ -179,8 +179,8 @@ export async function GET(request: Request) {
         console.log(`Fetching plans for service type ${serviceTypeId} (${serviceTypeName})`)
 
         // Expand our include parameters to get more complete data
-        // Note: include=person added to get person details for team members
-        let nextPage = `${BASE_URL}/service_types/${serviceTypeId}/plans?filter=future&include=service_type,plan_times,teams,team_members.person,plan_people,people`
+        // Note: We'll fetch team members separately, so don't include them in the main request
+        let nextPage = `${BASE_URL}/service_types/${serviceTypeId}/plans?filter=future&include=service_type,plan_times,teams,plan_people`
 
         while (nextPage) {
           const response = await axios.get(nextPage, {
@@ -206,7 +206,7 @@ export async function GET(request: Request) {
               }
             })
 
-            // For each plan, fetch its items separately
+            // For each plan, fetch its items and team members separately
             for (const plan of servicePlansData) {
               try {
                 console.log(`Fetching items for plan ${plan.id} (${plan.attributes.title || 'Untitled'})`)
@@ -238,11 +238,37 @@ export async function GET(request: Request) {
                 )
 
                 console.log(`Found ${songItems.length} songs in plan ${plan.id}`)
+
+                // Now fetch team members directly
+                console.log(`Fetching team members for plan ${plan.id}`)
+
+                const teamMembersResponse = await axios.get(
+                  `${BASE_URL}/service_types/${serviceTypeId}/plans/${plan.id}/team_members?include=person,team`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${token}`
+                    },
+                    timeout: 20000
+                  }
+                )
+
+                debugResponse(teamMembersResponse, `Team members for plan ${plan.id}`)
+
+                // Merge the team members data
+                if (teamMembersResponse.data.included) {
+                  allIncludedData = [...allIncludedData, ...teamMembersResponse.data.included]
+                }
+
+                // Store the team members directly on the plan
+                plan._teamMembers = teamMembersResponse.data.data || []
+
+                console.log(`Found ${plan._teamMembers.length} team members in plan ${plan.id}`)
               } catch (itemsError: any) {
-                console.error(`Error fetching items for plan ${plan.id}:`, itemsError.message)
+                console.error(`Error fetching additional data for plan ${plan.id}:`, itemsError.message)
 
                 // Continue with next plan even if this one fails
-                plan._items = []
+                plan._items = plan._items || []
+                plan._teamMembers = plan._teamMembers || []
               }
             }
 
@@ -253,8 +279,9 @@ export async function GET(request: Request) {
               )
               console.log(`Relationships:`, Object.keys(plan.relationships || {}))
 
-              // Check for items
+              // Check for items and team members
               console.log(`Items: ${plan._items?.length || 0}`)
+              console.log(`Team members: ${plan._teamMembers?.length || 0}`)
 
               // Check for teams
               const teamRelationships = plan.relationships?.teams?.data || []
@@ -399,6 +426,11 @@ export async function GET(request: Request) {
 
         console.log(`Team IDs found: ${teamIds.length}`)
 
+        // Get team members directly rather than filtering from includedData
+        const allTeamMembers = plan._teamMembers || []
+
+        console.log(`Team members directly fetched: ${allTeamMembers.length}`)
+
         const teams = teamIds
           .map((teamId: any) => {
             const teamItem = allIncludedData.find(item => item.type === 'Team' && item.id === teamId.id)
@@ -411,10 +443,34 @@ export async function GET(request: Request) {
 
             console.log(`Found team: ${teamItem.id} - ${teamItem.attributes.name}`)
 
+            // Filter team members for just this team
+            const teamMembers = allTeamMembers
+              .filter((member: any) => member.relationships?.team?.data?.id === teamItem.id)
+              .map((member: any) => {
+                // Try to get the person data if available
+                const personId = member.relationships?.person?.data?.id
+                let personData = null
+
+                if (personId) {
+                  personData = allIncludedData.find((item: any) => item.type === 'Person' && item.id === personId)
+                }
+
+                return {
+                  id: member.id,
+                  name: member.attributes.name,
+                  position: member.attributes.team_position_name || 'Member',
+                  personId: personId || null,
+                  personName: personData
+                    ? `${personData.attributes.first_name} ${personData.attributes.last_name}`
+                    : member.attributes.name,
+                  status: member.attributes.status
+                }
+              })
+
             return {
               id: teamItem.id,
               name: teamItem.attributes.name,
-              members: getTeamMembers(teamItem.id, allIncludedData)
+              members: teamMembers
             }
           })
           .filter(Boolean)
@@ -517,41 +573,5 @@ export async function GET(request: Request) {
       { error: 'Failed to fetch service plans from Planning Center', message: error.message },
       { status: error.response?.status || 500 }
     )
-  }
-}
-
-// Helper function to get team members
-function getTeamMembers(teamId: string, includedData: any[]) {
-  try {
-    const teamMembers = includedData.filter(
-      item => item.type === 'TeamMember' && item.relationships?.team?.data?.id === teamId
-    )
-
-    console.log(`Found ${teamMembers.length} members for team ${teamId}`)
-
-    return teamMembers.map(member => {
-      // Try to get the person data if available
-      const personId = member.relationships?.person?.data?.id
-      let personData = null
-
-      if (personId) {
-        personData = includedData.find(item => item.type === 'Person' && item.id === personId)
-      }
-
-      return {
-        id: member.id,
-        name: member.attributes.name,
-        position: member.attributes.team_position_name || 'Member',
-        personId: personId || null,
-        personName: personData
-          ? `${personData.attributes.first_name} ${personData.attributes.last_name}`
-          : member.attributes.name,
-        status: member.attributes.status
-      }
-    })
-  } catch (error) {
-    console.error('Error getting team members:', error)
-
-    return [] // Return empty array if there's an error
   }
 }
