@@ -8,120 +8,78 @@ import Typography from '@mui/material/Typography'
 import Card from '@mui/material/Card'
 import Grid from '@mui/material/Grid'
 import CardContent from '@mui/material/CardContent'
-import FormControl from '@mui/material/FormControl'
-import InputLabel from '@mui/material/InputLabel'
-import Select from '@mui/material/Select'
-import MenuItem from '@mui/material/MenuItem'
-import Button from '@mui/material/Button'
-import PrintIcon from '@mui/icons-material/Print'
 import Chip from '@mui/material/Chip'
+import Accordion from '@mui/material/Accordion'
+import AccordionSummary from '@mui/material/AccordionSummary'
+import AccordionDetails from '@mui/material/AccordionDetails'
+import Box from '@mui/material/Box'
+import IconButton from '@mui/material/IconButton'
+
+// Icons
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import EventIcon from '@mui/icons-material/Event'
+import MusicNoteIcon from '@mui/icons-material/MusicNote'
+import GroupIcon from '@mui/icons-material/Group'
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 
 // Third-party Imports
 import axios from 'axios'
 
-// Components Imports
-import CustomAvatar from '@core/components/mui/Avatar'
-
-// Styles Imports
-import tableStyles from '@core/styles/table.module.css'
-
 interface ServicePlan {
   id: string
   title: string
-  date: string
-  time: string
-  serviceName: string
-  leaderName: string
-  leaderId: string
-  leaderAvatar: string
-  teamMembers: TeamMember[]
-  status: 'draft' | 'planned' | 'confirmed'
-}
-
-interface TeamMember {
-  id: string
-  name: string
-  role: string
-  avatar: string
-}
-
-const formatDate = (dateString: string) => {
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+  serviceTypeName: string
+  dates: {
+    sort: string
+    planningCenter: string
+    formatted: string
   }
-
-  return new Date(dateString).toLocaleDateString(undefined, options)
+  status: string
+  planTimes: {
+    id: string
+    startsAt: string
+    endsAt: string
+    timeFormatted: string
+  }[]
+  songs: {
+    id: string
+    title: string
+    author: string
+  }[]
+  teams: {
+    id: string
+    name: string
+    members: {
+      id: string
+      name: string
+      position: string
+      status: string
+    }[]
+  }[]
+  createdAt: string
+  updatedAt: string
+  totalItems: number
+  planningCenterUrl: string
 }
 
-// Add a simple mock data const for fallback
-const MOCK_SERVICE_PLANS: ServicePlan[] = [
-  {
-    id: 'mock1',
-    title: 'Sunday Morning Worship (Mock)',
-    date: '2025-03-10',
-    time: '9:00 AM',
-    serviceName: 'Sunday Service',
-    leaderName: 'John Smith',
-    leaderId: 'leader1',
-    leaderAvatar: '',
-    teamMembers: [
-      {
-        id: 'tm1',
-        name: 'Sarah Johnson',
-        role: 'Worship Leader',
-        avatar: ''
-      },
-      {
-        id: 'tm2',
-        name: 'Mike Davis',
-        role: 'Piano',
-        avatar: ''
-      }
-    ],
-    status: 'confirmed'
-  },
-  {
-    id: 'mock2',
-    title: 'Sunday Evening Worship (Mock)',
-    date: '2025-03-10',
-    time: '6:00 PM',
-    serviceName: 'Evening Service',
-    leaderName: 'Jane Wilson',
-    leaderId: 'leader2',
-    leaderAvatar: '',
-    teamMembers: [],
-    status: 'planned'
-  },
-  {
-    id: 'mock3',
-    title: 'Wednesday Bible Study (Mock)',
-    date: '2025-03-13',
-    time: '7:00 PM',
-    serviceName: 'Midweek Service',
-    leaderName: 'Pastor David Anderson',
-    leaderId: 'leader3',
-    leaderAvatar: '',
-    teamMembers: [
-      {
-        id: 'tm3',
-        name: 'Jennifer Smith',
-        role: 'Coordinator',
-        avatar: ''
-      }
-    ],
-    status: 'draft'
+const getStatusColor = (status: string) => {
+  switch (status.toLowerCase()) {
+    case 'confirmed':
+      return 'success'
+    case 'unconfirmed':
+      return 'warning'
+    case 'draft':
+      return 'info'
+    default:
+      return 'default'
   }
-]
+}
 
 const ServicePlansTable = () => {
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([])
-  const [filteredPlans, setFilteredPlans] = useState<ServicePlan[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedServiceType, setSelectedServiceType] = useState('all')
+  const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -129,25 +87,18 @@ const ServicePlansTable = () => {
       try {
         setLoading(true)
 
-        const response = await axios.get('/api/planning-center/service-plans')
-        const data = response.data
+        const response = await axios.get('/api/planning-center/services', {
+          headers: {
+            Authorization: `Bearer YOUR_ACCESS_TOKEN`
+          }
+        })
 
-        console.log('API Response:', data)
-
-        setServicePlans(data)
-        setFilteredPlans(data)
+        setServicePlans(response.data)
       } catch (err: any) {
         console.error('Fetch error:', err)
+        setError('Failed to fetch service plans from Planning Center')
 
-        // If we have a network error, use mock data instead of redirecting
-        if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-          console.log('Network error, using mock data')
-          setServicePlans(MOCK_SERVICE_PLANS)
-          setFilteredPlans(MOCK_SERVICE_PLANS)
-          setError('Using mock data due to network issues. Some features may be limited.')
-        } else {
-          // For other errors like authentication, redirect to auth
-          setError('Failed to fetch service plans from Planning Center')
+        if (err.response?.status === 401) {
           router.push('/api/planning-center/auth')
         }
       } finally {
@@ -158,188 +109,8 @@ const ServicePlansTable = () => {
     fetchServicePlans()
   }, [router])
 
-  useEffect(() => {
-    if (selectedServiceType === 'all') {
-      setFilteredPlans(servicePlans)
-    } else {
-      setFilteredPlans(servicePlans.filter(plan => plan.serviceName === selectedServiceType))
-    }
-  }, [selectedServiceType, servicePlans])
-
-  const serviceTypes = ['all', ...new Set(servicePlans.map(plan => plan.serviceName))]
-
-  const handlePrint = () => {
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank')
-
-    if (!printWindow) {
-      alert('Please allow popups for this website')
-
-      return
-    }
-
-    // Generate the HTML content for printing
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Upcoming Service Plans</title>
-          <style>
-            @media print {
-              @page {
-                margin: 0.5in;
-              }
-              body {
-                font-family: Arial, sans-serif;
-                color: #333;
-                line-height: 1.5;
-                position: relative;
-                min-height: 100vh;
-              }
-              .header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                margin-bottom: 20px;
-                border-bottom: 1px solid #ddd;
-                padding-bottom: 10px;
-              }
-              .title {
-                font-size: 24px;
-                font-weight: bold;
-                display: flex;
-                align-items: center;
-              }
-              .logo {
-                margin-right: 10px;
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-              }
-              th {
-                text-align: left;
-                padding: 8px;
-                border-bottom: 2px solid #ddd;
-                font-weight: bold;
-              }
-              td {
-                padding: 8px;
-                border-bottom: 1px solid #eee;
-              }
-              .page-break {
-                page-break-after: always;
-              }
-              .status {
-                display: inline-block;
-                padding: 3px 8px;
-                border-radius: 12px;
-                font-size: 12px;
-              }
-              .status.draft {
-                background-color: #f3f3f3;
-                color: #666;
-              }
-              .status.planned {
-                background-color: #e1f5fe;
-                color: #0288d1;
-              }
-              .status.confirmed {
-                background-color: #e8f5e9;
-                color: #2e7d32;
-              }
-              .team-members {
-                margin-top: 5px;
-                font-size: 12px;
-                color: #666;
-              }
-              .footer {
-                font-style: italic;
-                color: #777;
-                opacity: 0.6;
-                text-align: center;
-                margin-top: 20px;
-                padding-top: 10px;
-                border-top: 1px solid #eee;
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                right: 0;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="title">
-              <span>EasyChurch</span>
-            </div>
-            <div>Upcoming Service Plans</div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Title</th>
-                <th>Service</th>
-                <th>Leader</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredPlans
-                .map(
-                  plan => `
-                <tr>
-                  <td>${formatDate(plan.date)}<br><small>${plan.time}</small></td>
-                  <td>${plan.title}</td>
-                  <td>${plan.serviceName}</td>
-                  <td>${plan.leaderName}
-                    ${
-                      plan.teamMembers.length > 0
-                        ? `<div class="team-members">Team: ${plan.teamMembers.map(member => `${member.name} (${member.role})`).join(', ')}</div>`
-                        : ''
-                    }
-                  </td>
-                  <td><div class="status ${plan.status}">${plan.status.charAt(0).toUpperCase() + plan.status.slice(1)}</div></td>
-                </tr>
-              `
-                )
-                .join('')}
-            </tbody>
-          </table>
-          <div class="footer">
-            Printed on ${new Date().toLocaleDateString()} - EasyChurch Planning Center
-          </div>
-        </body>
-      </html>
-    `
-
-    // Write the content to the new window
-    printWindow.document.open()
-    printWindow.document.write(printContent)
-    printWindow.document.close()
-
-    // Wait for content to load before printing
-    printWindow.onload = function () {
-      // Small delay to ensure everything is rendered properly
-      setTimeout(() => {
-        printWindow.print()
-      }, 300)
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return { bgcolor: 'grey.100', color: 'text.secondary' }
-      case 'planned':
-        return { bgcolor: 'info.lighter', color: 'info.dark' }
-      case 'confirmed':
-        return { bgcolor: 'success.lighter', color: 'success.dark' }
-      default:
-        return { bgcolor: 'grey.100', color: 'text.secondary' }
-    }
+  const handleAccordionChange = (planId: string) => {
+    setExpandedPlanId(expandedPlanId === planId ? null : planId)
   }
 
   return (
@@ -347,176 +118,149 @@ const ServicePlansTable = () => {
       <Grid item xs={12}>
         <Card>
           <CardContent>
-            <form onSubmit={e => e.preventDefault()}>
-              <Grid container spacing={5}>
-                <Grid item xs={12} sm={9}>
-                  <FormControl fullWidth>
-                    <InputLabel>Service Type</InputLabel>
-                    <Select
-                      label='Service Type'
-                      value={selectedServiceType}
-                      onChange={e => {
-                        setSelectedServiceType(e.target.value)
-                      }}
-                    >
-                      {serviceTypes.map((type, index) => (
-                        <MenuItem key={index} value={type}>
-                          {type === 'all' ? 'All Services' : type}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={3} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Button
-                    variant='contained'
-                    color='primary'
-                    onClick={handlePrint}
-                    startIcon={<PrintIcon />}
-                    disabled={loading || filteredPlans.length === 0}
-                    fullWidth
-                  >
-                    Print
-                  </Button>
-                </Grid>
-              </Grid>
-            </form>
+            <Typography variant='h5' component='h2' gutterBottom>
+              Upcoming Service Plans
+            </Typography>
           </CardContent>
         </Card>
       </Grid>
+
       <Grid item xs={12}>
-        <Card>
-          <div className='overflow-x-auto'>
-            <table className={tableStyles.table}>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Title</th>
-                  <th>Service</th>
-                  <th>Leader</th>
-                  <th>Team</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6}>
-                      <Typography align='center' className='animate-pulse italic'>
-                        Loading service plans...
+        {loading ? (
+          <Card>
+            <CardContent>
+              <Typography align='center' className='animate-pulse italic'>
+                Loading service plans...
+              </Typography>
+            </CardContent>
+          </Card>
+        ) : error ? (
+          <Card>
+            <CardContent>
+              <Typography color='error' align='center'>
+                {error}
+              </Typography>
+            </CardContent>
+          </Card>
+        ) : servicePlans.length === 0 ? (
+          <Card>
+            <CardContent>
+              <Typography align='center'>No upcoming service plans found.</Typography>
+            </CardContent>
+          </Card>
+        ) : (
+          servicePlans.map(plan => (
+            <Accordion
+              key={plan.id}
+              expanded={expandedPlanId === plan.id}
+              onChange={() => handleAccordionChange(plan.id)}
+              sx={{ mb: 2 }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Grid container alignItems='center' spacing={2}>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant='h6' component='div'>
+                      {plan.title}
+                    </Typography>
+                    <Typography variant='body2' color='text.secondary'>
+                      {plan.serviceTypeName}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Box display='flex' alignItems='center'>
+                      <EventIcon sx={{ mr: 1, color: 'primary.main' }} />
+                      <Typography variant='body2'>{plan.dates.formatted}</Typography>
+                    </Box>
+                    {plan.planTimes.length > 0 && (
+                      <Typography variant='body2' color='text.secondary'>
+                        {plan.planTimes.map(time => time.timeFormatted).join(' & ')}
                       </Typography>
-                    </td>
-                  </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={6}>
-                      <Typography color='error' align='center'>
-                        {error}
-                      </Typography>
-                    </td>
-                  </tr>
-                ) : filteredPlans.length === 0 ? (
-                  <tr>
-                    <td colSpan={6}>
-                      <Typography color='error' align='center'>
-                        No service plans found.
-                      </Typography>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredPlans.map(plan => (
-                    <tr
-                      key={plan.id}
-                      style={{
-                        cursor: 'pointer',
-                        transition: 'background-color 0.3s'
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)'
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.backgroundColor = ''
-                      }}
+                    )}
+                  </Grid>
+                  <Grid item xs={12} md={4} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <Chip label={plan.status} color={getStatusColor(plan.status) as any} size='small' sx={{ mr: 2 }} />
+                    <IconButton
+                      component='a'
+                      href={plan.planningCenterUrl}
+                      target='_blank'
+                      size='small'
+                      sx={{ color: 'primary.main' }}
                     >
-                      <td className='!plb-1'>
-                        <div className='flex flex-col'>
-                          <Typography color='text.primary' className='font-medium'>
-                            {formatDate(plan.date)}
-                          </Typography>
-                          <Typography variant='body2' color='text.secondary'>
-                            {plan.time}
-                          </Typography>
-                        </div>
-                      </td>
-                      <td className='!plb-1'>
-                        <div className='flex flex-col'>
-                          <Typography color='text.primary' className='font-medium'>
-                            <a
-                              href={`https://services.planningcenteronline.com/plans/${plan.id}`}
-                              target='_blank'
-                              rel='noopener noreferrer'
-                              style={{
-                                textDecoration: 'none',
-                                color: 'inherit'
-                              }}
-                            >
-                              {plan.title}
-                            </a>
-                          </Typography>
-                        </div>
-                      </td>
-                      <td className='!plb-1'>
-                        <Typography variant='body2'>{plan.serviceName}</Typography>
-                      </td>
-                      <td className='!plb-1'>
-                        <div className='flex items-center gap-3'>
-                          <CustomAvatar src={plan.leaderAvatar} size={34} />
-                          <div className='flex flex-col'>
-                            <Typography color='text.primary' className='font-medium'>
-                              <a
-                                href={`https://people.planningcenteronline.com/people/${plan.leaderId}`}
-                                target='_blank'
-                                rel='noopener noreferrer'
-                                style={{
-                                  textDecoration: 'none',
-                                  color: 'inherit'
-                                }}
-                              >
-                                {plan.leaderName}
-                              </a>
+                      <OpenInNewIcon />
+                    </IconButton>
+                  </Grid>
+                </Grid>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Grid container spacing={3}>
+                  {/* Songs Section */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant='subtitle1' gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                      <MusicNoteIcon sx={{ mr: 1 }} /> Songs
+                    </Typography>
+                    {plan.songs.length > 0 ? (
+                      <Box component='ul' sx={{ pl: 2 }}>
+                        {plan.songs.map(song => (
+                          <Box component='li' key={song.id} sx={{ mb: 1 }}>
+                            <Typography variant='body2'>
+                              <strong>{song.title}</strong>
+                              {song.author && <span> by {song.author}</span>}
                             </Typography>
-                          </div>
-                        </div>
-                      </td>
-                      <td className='!plb-1'>
-                        {plan.teamMembers.map((member, index) => (
-                          <div key={index} className='mb-1'>
-                            <Typography variant='caption' sx={{ fontWeight: 600 }}>
-                              {member.role}:
-                            </Typography>
-                            <Typography variant='caption'> {member.name}</Typography>
-                          </div>
+                          </Box>
                         ))}
-                      </td>
-                      <td className='!plb-1'>
-                        <Chip
-                          label={plan.status.charAt(0).toUpperCase() + plan.status.slice(1)}
-                          size='small'
-                          sx={getStatusColor(plan.status)}
-                        />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
-          <Typography variant='body2' color='text.secondary' align='center' sx={{ fontStyle: 'italic', opacity: 0.6 }}>
-            Showing {filteredPlans.length} upcoming service plans.
-          </Typography>
-        </div>
+                      </Box>
+                    ) : (
+                      <Typography variant='body2' color='text.secondary'>
+                        No songs added yet
+                      </Typography>
+                    )}
+                  </Grid>
+
+                  {/* Teams Section */}
+                  <Grid item xs={12} md={6}>
+                    <Typography variant='subtitle1' gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                      <GroupIcon sx={{ mr: 1 }} /> Teams
+                    </Typography>
+                    {plan.teams.length > 0 ? (
+                      plan.teams.map(team => (
+                        <Box key={team.id} sx={{ mb: 2 }}>
+                          <Typography variant='body2' fontWeight='bold' gutterBottom>
+                            {team.name}
+                          </Typography>
+                          {team.members.length > 0 ? (
+                            <Box component='ul' sx={{ pl: 2 }}>
+                              {team.members.map(member => (
+                                <Box component='li' key={member.id}>
+                                  <Typography variant='body2'>
+                                    {member.name} - <span style={{ fontStyle: 'italic' }}>{member.position}</span>
+                                    <Chip
+                                      label={member.status}
+                                      size='small'
+                                      color={member.status === 'confirmed' ? 'success' : 'warning'}
+                                      sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
+                                    />
+                                  </Typography>
+                                </Box>
+                              ))}
+                            </Box>
+                          ) : (
+                            <Typography variant='body2' color='text.secondary'>
+                              No team members assigned
+                            </Typography>
+                          )}
+                        </Box>
+                      ))
+                    ) : (
+                      <Typography variant='body2' color='text.secondary'>
+                        No teams scheduled
+                      </Typography>
+                    )}
+                  </Grid>
+                </Grid>
+              </AccordionDetails>
+            </Accordion>
+          ))
+        )}
       </Grid>
     </Grid>
   )

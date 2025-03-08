@@ -8,47 +8,55 @@ export const dynamic = 'force-dynamic'
 
 const CLIENT_ID = process.env.PC_CLIENT_ID
 
+// Get default redirect URI from environment
+const DEFAULT_REDIRECT_URI = process.env.PC_REDIRECT_URI
+
 //console.log('Client ID:', CLIENT_ID)
+//console.log('Redirect URI:', DEFAULT_REDIRECT_URI)
 
 export async function GET(request: Request) {
   try {
     // Generate a random state parameter for security
     const state = crypto.randomBytes(16).toString('hex')
 
-    // Get host information from headers
+    // Get headers to check for forwarded host
     const headersList = headers()
-    const forwardedHost = headersList.get('x-forwarded-host')
-    const forwardedProto = headersList.get('x-forwarded-proto') || 'https'
+    const xForwardedHost = headersList.get('x-forwarded-host')
+    const xForwardedProto = headersList.get('x-forwarded-proto') || 'https'
     const host = headersList.get('host')
 
-    // Determine base URL
-    let baseUrl
+    // Determine the actual host, prioritizing forwarded headers for proxies like ngrok
+    let actualHost: string
 
-    if (forwardedHost) {
-      baseUrl = `${forwardedProto}://${forwardedHost}`
-      console.log('Auth using forwarded host:', baseUrl)
+    if (xForwardedHost) {
+      // Use forwarded host (e.g., from ngrok)
+      actualHost = `${xForwardedProto}://${xForwardedHost}`
+      console.log('Using forwarded host:', actualHost)
     } else if (host) {
-      baseUrl = `https://${host}`
-      console.log('Auth using host header:', baseUrl)
+      // Fall back to the regular host header
+      actualHost = `https://${host}`
+      console.log('Using host header:', actualHost)
     } else {
-      const reqUrl = new URL(request.url)
+      // Last resort - parse from request URL
+      const requestUrl = new URL(request.url)
 
-      baseUrl = reqUrl.origin
-      console.log('Auth using request URL origin:', baseUrl)
+      actualHost = requestUrl.origin
+      console.log('Using request URL origin:', actualHost)
     }
 
-    // Create callback URL using the same host
-    const callbackUrl = `${baseUrl}/api/planning-center/callback`
+    // Build a dynamic redirect URI based on the detected host
+    const dynamicRedirectUri = `${actualHost}/api/planning-center/callback`
+    const redirectUri = dynamicRedirectUri || DEFAULT_REDIRECT_URI || ''
+    const encodedUri = encodeURIComponent(redirectUri)
 
-    console.log('Using redirect URI:', callbackUrl)
+    console.log('Using redirect URI:', redirectUri)
 
-    // Build the authorization URL with the correct callback URL
     const authUrl =
       `https://api.planningcenteronline.com/oauth/authorize?` +
       `client_id=${CLIENT_ID}&` +
-      `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
+      `redirect_uri=${encodedUri}&` +
       `response_type=code&` +
-      `scope=people services&` +
+      `scope=people services&` + // Include both people and services scopes
       `state=${state}`
 
     console.log('Generated Authorization URL:', authUrl)
