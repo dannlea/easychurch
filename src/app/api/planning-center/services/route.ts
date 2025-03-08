@@ -32,6 +32,8 @@ export async function GET(request: Request) {
     // Get all future service plans
     let allServicePlans: any[] = []
     let allIncludedData: any[] = [] // Initialize an array to collect all included data
+    // Keep track of which service type each plan belongs to
+    const planServiceTypes: Record<string, string> = {}
 
     try {
       // First, get all service types
@@ -62,8 +64,9 @@ export async function GET(request: Request) {
       // Then, get plans for each service type
       for (const serviceType of serviceTypes) {
         const serviceTypeId = serviceType.id
+        const serviceTypeName = serviceType.attributes.name
 
-        console.log(`Fetching plans for service type ${serviceTypeId}`)
+        console.log(`Fetching plans for service type ${serviceTypeId} (${serviceTypeName})`)
 
         // Get plans from today forward, include teams, team_members, and arrangements
         let nextPage = `${BASE_URL}/service_types/${serviceTypeId}/plans?filter=future&include=plan_times,teams,team_members,songs,arrangements&per_page=50`
@@ -81,6 +84,11 @@ export async function GET(request: Request) {
 
           if (servicePlansData.length > 0) {
             console.log(`Found ${servicePlansData.length} plans for service type ${serviceTypeId}`)
+
+            // Record the service type ID for each plan
+            servicePlansData.forEach((plan: any) => {
+              planServiceTypes[plan.id] = serviceTypeId
+            })
             allServicePlans = [...allServicePlans, ...servicePlansData]
             allIncludedData = [...allIncludedData, ...includedData] // Collect included data
             progress = allServicePlans.length // Update progress
@@ -170,6 +178,7 @@ export async function GET(request: Request) {
             id: plan.id,
             title: plan.attributes.title || 'Untitled Service',
             serviceTypeName: plan.attributes.series_title,
+            serviceTypeId: planServiceTypes[plan.id], // Use the recorded service type ID
             dates: {
               sort: plan.attributes.sort_date,
               planningCenter: plan.attributes.dates,

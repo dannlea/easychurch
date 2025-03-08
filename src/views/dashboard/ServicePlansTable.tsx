@@ -14,6 +14,11 @@ import AccordionSummary from '@mui/material/AccordionSummary'
 import AccordionDetails from '@mui/material/AccordionDetails'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
+import FormControl from '@mui/material/FormControl'
+import InputLabel from '@mui/material/InputLabel'
+import type { SelectChangeEvent } from '@mui/material/Select'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
 
 // Icons
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -21,6 +26,7 @@ import EventIcon from '@mui/icons-material/Event'
 import MusicNoteIcon from '@mui/icons-material/MusicNote'
 import GroupIcon from '@mui/icons-material/Group'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
+import FolderIcon from '@mui/icons-material/Folder'
 
 // Third-party Imports
 import axios from 'axios'
@@ -29,6 +35,7 @@ interface ServicePlan {
   id: string
   title: string
   serviceTypeName: string
+  serviceTypeId: string
   dates: {
     sort: string
     planningCenter: string
@@ -62,6 +69,11 @@ interface ServicePlan {
   planningCenterUrl: string
 }
 
+interface ServiceType {
+  id: string
+  name: string
+}
+
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case 'confirmed':
@@ -77,6 +89,9 @@ const getStatusColor = (status: string) => {
 
 const ServicePlansTable = () => {
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([])
+  const [filteredPlans, setFilteredPlans] = useState<ServicePlan[]>([])
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([])
+  const [selectedServiceType, setSelectedServiceType] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null)
@@ -93,7 +108,25 @@ const ServicePlansTable = () => {
           }
         })
 
-        setServicePlans(response.data)
+        const plans: ServicePlan[] = response.data
+
+        setServicePlans(plans)
+        setFilteredPlans(plans)
+
+        const typesMap = new Map<string, ServiceType>()
+
+        plans.forEach(plan => {
+          if (plan.serviceTypeName && !typesMap.has(plan.serviceTypeId)) {
+            typesMap.set(plan.serviceTypeId, {
+              id: plan.serviceTypeId,
+              name: plan.serviceTypeName
+            })
+          }
+        })
+
+        const uniqueTypes = Array.from(typesMap.values())
+
+        setServiceTypes(uniqueTypes)
       } catch (err: any) {
         console.error('Fetch error:', err)
         setError('Failed to fetch service plans from Planning Center')
@@ -109,8 +142,22 @@ const ServicePlansTable = () => {
     fetchServicePlans()
   }, [router])
 
+  useEffect(() => {
+    if (selectedServiceType === 'all') {
+      setFilteredPlans(servicePlans)
+    } else {
+      const filtered = servicePlans.filter(plan => plan.serviceTypeId === selectedServiceType)
+
+      setFilteredPlans(filtered)
+    }
+  }, [selectedServiceType, servicePlans])
+
   const handleAccordionChange = (planId: string) => {
     setExpandedPlanId(expandedPlanId === planId ? null : planId)
+  }
+
+  const handleServiceTypeChange = (event: SelectChangeEvent) => {
+    setSelectedServiceType(event.target.value)
   }
 
   return (
@@ -118,9 +165,33 @@ const ServicePlansTable = () => {
       <Grid item xs={12}>
         <Card>
           <CardContent>
-            <Typography variant='h5' component='h2' gutterBottom>
-              Upcoming Service Plans
-            </Typography>
+            <Grid container spacing={3} alignItems='center'>
+              <Grid item xs={12} md={6}>
+                <Typography variant='h5' component='h2' gutterBottom>
+                  Upcoming Service Plans
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel id='service-type-select-label'>Service Folder</InputLabel>
+                  <Select
+                    labelId='service-type-select-label'
+                    id='service-type-select'
+                    value={selectedServiceType}
+                    label='Service Folder'
+                    onChange={handleServiceTypeChange}
+                    startAdornment={<FolderIcon sx={{ mr: 1, color: 'action.active' }} />}
+                  >
+                    <MenuItem value='all'>All Service Folders</MenuItem>
+                    {serviceTypes.map(type => (
+                      <MenuItem key={type.id} value={type.id}>
+                        {type.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
           </CardContent>
         </Card>
       </Grid>
@@ -142,14 +213,18 @@ const ServicePlansTable = () => {
               </Typography>
             </CardContent>
           </Card>
-        ) : servicePlans.length === 0 ? (
+        ) : filteredPlans.length === 0 ? (
           <Card>
             <CardContent>
-              <Typography align='center'>No upcoming service plans found.</Typography>
+              <Typography align='center'>
+                {selectedServiceType === 'all'
+                  ? 'No upcoming service plans found.'
+                  : 'No upcoming service plans found for the selected service folder.'}
+              </Typography>
             </CardContent>
           </Card>
         ) : (
-          servicePlans.map(plan => (
+          filteredPlans.map(plan => (
             <Accordion
               key={plan.id}
               expanded={expandedPlanId === plan.id}
