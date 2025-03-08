@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     let allServicePlans: any[] = []
     let allIncludedData: any[] = [] // Initialize an array to collect all included data
     // Keep track of which service type each plan belongs to
-    const planServiceTypes: Record<string, string> = {}
+    const planServiceTypes: Record<string, { id: string; name: string }> = {}
 
     try {
       // First, get all service types
@@ -85,9 +85,12 @@ export async function GET(request: Request) {
           if (servicePlansData.length > 0) {
             console.log(`Found ${servicePlansData.length} plans for service type ${serviceTypeId}`)
 
-            // Record the service type ID for each plan
+            // Record the service type ID and name for each plan
             servicePlansData.forEach((plan: any) => {
-              planServiceTypes[plan.id] = serviceTypeId
+              planServiceTypes[plan.id] = {
+                id: serviceTypeId,
+                name: serviceTypeName
+              }
             })
             allServicePlans = [...allServicePlans, ...servicePlansData]
             allIncludedData = [...allIncludedData, ...includedData] // Collect included data
@@ -177,8 +180,8 @@ export async function GET(request: Request) {
           return {
             id: plan.id,
             title: plan.attributes.title || 'Untitled Service',
-            serviceTypeName: plan.attributes.series_title,
-            serviceTypeId: planServiceTypes[plan.id], // Use the recorded service type ID
+            serviceTypeName: planServiceTypes[plan.id]?.name || 'Unknown Service Type',
+            serviceTypeId: planServiceTypes[plan.id]?.id || 'unknown',
             dates: {
               sort: plan.attributes.sort_date,
               planningCenter: plan.attributes.dates,
