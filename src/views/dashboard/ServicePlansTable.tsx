@@ -42,6 +42,7 @@ interface ServicePlan {
     formatted: string
   }
   status: string
+  formattedTimes: string | null
   planTimes: {
     id: string
     startsAt: string
@@ -52,6 +53,10 @@ interface ServicePlan {
     id: string
     title: string
     author: string
+    ccli?: string
+    arrangementId?: string
+    key?: string
+    bpm?: number
   }[]
   teams: {
     id: string
@@ -246,9 +251,17 @@ const ServicePlansTable = () => {
                       <EventIcon sx={{ mr: 1, color: 'primary.main' }} />
                       <Typography variant='body2'>{plan.dates.formatted}</Typography>
                     </Box>
-                    {plan.planTimes.length > 0 && (
+                    {plan.formattedTimes ? (
+                      <Typography variant='body2' color='text.secondary'>
+                        {plan.formattedTimes}
+                      </Typography>
+                    ) : plan.planTimes.length > 0 ? (
                       <Typography variant='body2' color='text.secondary'>
                         {plan.planTimes.map(time => time.timeFormatted).join(' & ')}
+                      </Typography>
+                    ) : (
+                      <Typography variant='body2' color='text.secondary' sx={{ fontStyle: 'italic' }}>
+                        No times scheduled
                       </Typography>
                     )}
                   </Grid>
@@ -273,13 +286,15 @@ const ServicePlansTable = () => {
                     <Typography variant='subtitle1' gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                       <MusicNoteIcon sx={{ mr: 1 }} /> Songs
                     </Typography>
-                    {plan.songs.length > 0 ? (
+                    {plan.songs && plan.songs.length > 0 ? (
                       <Box component='ul' sx={{ pl: 2 }}>
                         {plan.songs.map(song => (
                           <Box component='li' key={song.id} sx={{ mb: 1 }}>
                             <Typography variant='body2'>
                               <strong>{song.title}</strong>
                               {song.author && <span> by {song.author}</span>}
+                              {song.key && <span> (Key: {song.key})</span>}
+                              {song.ccli && <span> • CCLI: {song.ccli}</span>}
                             </Typography>
                           </Box>
                         ))}

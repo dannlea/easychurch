@@ -68,15 +68,15 @@ export async function GET(request: Request) {
 
         console.log(`Fetching plans for service type ${serviceTypeId} (${serviceTypeName})`)
 
-        // Get plans from today forward, include teams, team_members, and arrangements
-        let nextPage = `${BASE_URL}/service_types/${serviceTypeId}/plans?filter=future&include=plan_times,teams,team_members,songs,arrangements&per_page=50`
+        // Expand the include parameter to get more relationships
+        let nextPage = `${BASE_URL}/service_types/${serviceTypeId}/plans?filter=future&include=plan_times,service_type,teams,team_members,songs,arrangements,item_times,items&per_page=50`
 
         while (nextPage) {
           const response = await axios.get(nextPage, {
             headers: {
               Authorization: `Bearer ${token}`
             },
-            timeout: 15000 // Set a timeout of 15 seconds
+            timeout: 20000 // Increase timeout for more data
           })
 
           const servicePlansData = response.data.data || []
@@ -123,57 +123,111 @@ export async function GET(request: Request) {
     try {
       // Format the service plans data
       const formattedServicePlans = allServicePlans.map((plan: any) => {
+        // Add more detailed logging to troubleshoot
+        console.log(`Processing plan: ${plan.id} - ${plan.attributes.title || 'Untitled'}`)
+        console.log(`Plan relationships:`, Object.keys(plan.relationships || {}))
+
         // Find plan times
         const planTimeIds = plan.relationships.plan_times?.data || []
+
+        console.log(`Plan time IDs found: ${planTimeIds.length}`)
 
         const planTimes = planTimeIds
           .map((timeId: any) => {
             const timeItem = allIncludedData.find(item => item.type === 'PlanTime' && item.id === timeId.id)
 
-            return timeItem
-              ? {
-                  id: timeItem.id,
-                  startsAt: timeItem.attributes.starts_at,
-                  endsAt: timeItem.attributes.ends_at,
-                  timeFormatted: timeItem.attributes.time_formatted
-                }
-              : null
+            if (!timeItem) {
+              console.log(`Could not find plan time with ID: ${timeId.id}`)
+
+              return null
+            }
+
+            console.log(`Found plan time: ${timeItem.id} - ${timeItem.attributes.time_formatted}`)
+
+            return {
+              id: timeItem.id,
+              startsAt: timeItem.attributes.starts_at,
+              endsAt: timeItem.attributes.ends_at,
+              timeFormatted: timeItem.attributes.time_formatted
+            }
           })
           .filter(Boolean)
 
         // Find songs
         const songIds = plan.relationships.songs?.data || []
 
+        console.log(`Song IDs found: ${songIds.length}`)
+
         const songs = songIds
           .map((songId: any) => {
             const songItem = allIncludedData.find(item => item.type === 'Song' && item.id === songId.id)
 
-            return songItem
-              ? {
-                  id: songItem.id,
-                  title: songItem.attributes.title,
-                  author: songItem.attributes.author
+            if (!songItem) {
+              console.log(`Could not find song with ID: ${songId.id}`)
+
+              return null
+            }
+
+            // Get arrangement data if available
+            let arrangementData = {}
+            const arrangementIds = songItem.relationships?.arrangements?.data || []
+
+            if (arrangementIds.length > 0) {
+              const arrangement = allIncludedData.find(
+                item => item.type === 'Arrangement' && item.id === arrangementIds[0].id
+              )
+
+              if (arrangement) {
+                arrangementData = {
+                  arrangementId: arrangement.id,
+                  key: arrangement.attributes.key_name,
+                  bpm: arrangement.attributes.bpm
                 }
-              : null
+              }
+            }
+
+            console.log(`Found song: ${songItem.id} - ${songItem.attributes.title}`)
+
+            return {
+              id: songItem.id,
+              title: songItem.attributes.title,
+              author: songItem.attributes.author,
+              ccli: songItem.attributes.ccli_number,
+              ...arrangementData
+            }
           })
           .filter(Boolean)
 
         // Find teams involved
         const teamIds = plan.relationships.teams?.data || []
 
+        console.log(`Team IDs found: ${teamIds.length}`)
+
         const teams = teamIds
           .map((teamId: any) => {
             const teamItem = allIncludedData.find(item => item.type === 'Team' && item.id === teamId.id)
 
-            return teamItem
-              ? {
-                  id: teamItem.id,
-                  name: teamItem.attributes.name,
-                  members: getTeamMembers(teamItem.id, allIncludedData)
-                }
-              : null
+            if (!teamItem) {
+              console.log(`Could not find team with ID: ${teamId.id}`)
+
+              return null
+            }
+
+            console.log(`Found team: ${teamItem.id} - ${teamItem.attributes.name}`)
+
+            return {
+              id: teamItem.id,
+              name: teamItem.attributes.name,
+              members: getTeamMembers(teamItem.id, allIncludedData)
+            }
           })
           .filter(Boolean)
+
+        // Format plan times for display
+        const formattedTimes =
+          planTimes.length > 0
+            ? planTimes.map((time: { timeFormatted: string }) => time.timeFormatted).join(' & ')
+            : null
 
         // Safely access object properties
         try {
@@ -193,6 +247,7 @@ export async function GET(request: Request) {
               })
             },
             status: plan.attributes.status || 'unknown',
+            formattedTimes,
             planTimes,
             songs,
             teams,
@@ -205,6 +260,7 @@ export async function GET(request: Request) {
           }
         } catch (formattingError) {
           console.error('Error formatting service plan:', formattingError)
+          console.error('Plan data:', JSON.stringify(plan, null, 2).substring(0, 500) + '...')
 
           // Return a minimal object with error info when formatting fails
           return {
