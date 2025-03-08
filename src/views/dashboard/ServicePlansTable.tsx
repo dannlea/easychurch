@@ -60,6 +60,7 @@ interface ServicePlan {
     arrangementId?: string
     key?: string
     bpm?: number
+    sequence?: number | null
   }[]
   teams: {
     id: string
@@ -365,10 +366,12 @@ const ServicePlansTable = () => {
                     </Typography>
                     {plan.songs && plan.songs.length > 0 ? (
                       <Box component='ul' sx={{ pl: 2 }}>
-                        {plan.songs.map(song => (
+                        {plan.songs.map((song, index) => (
                           <Box component='li' key={song.id} sx={{ mb: 1 }}>
                             <Typography variant='body2'>
-                              <strong>{song.title}</strong>
+                              <strong>
+                                {index + 1}. {song.title}
+                              </strong>
                               {song.author && <span> by {song.author}</span>}
                               {song.key && <span> (Key: {song.key})</span>}
                               {song.ccli && <span> • CCLI: {song.ccli}</span>}

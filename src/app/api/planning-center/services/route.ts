@@ -180,7 +180,7 @@ export async function GET(request: Request) {
 
         // Expand our include parameters to get more complete data
         // Note: include=person added to get person details for team members
-        let nextPage = `${BASE_URL}/service_types/${serviceTypeId}/plans?filter=future&include=plan_times,service_type,teams,team_members.person,songs,arrangements,item_times,plan_people,people&per_page=25`
+        let nextPage = `${BASE_URL}/service_types/${serviceTypeId}/plans?filter=future&include=service_type,plan_times,teams,team_members.person,plan_people,people`
 
         while (nextPage) {
           const response = await axios.get(nextPage, {
@@ -206,6 +206,46 @@ export async function GET(request: Request) {
               }
             })
 
+            // For each plan, fetch its items separately
+            for (const plan of servicePlansData) {
+              try {
+                console.log(`Fetching items for plan ${plan.id} (${plan.attributes.title || 'Untitled'})`)
+
+                // Get the plan items (including songs)
+                const itemsResponse = await axios.get(
+                  `${BASE_URL}/service_types/${serviceTypeId}/plans/${plan.id}/items?include=song,arrangement`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${token}`
+                    },
+                    timeout: 20000
+                  }
+                )
+
+                debugResponse(itemsResponse, `Items for plan ${plan.id}`)
+
+                // Merge the included data from items into our collection
+                if (itemsResponse.data.included) {
+                  allIncludedData = [...allIncludedData, ...itemsResponse.data.included]
+                }
+
+                // Store the items data in a special property on the plan
+                plan._items = itemsResponse.data.data || []
+
+                // Count songs
+                const songItems = plan._items.filter(
+                  (item: any) => item.attributes.item_type === 'song' && item.relationships?.song?.data?.id
+                )
+
+                console.log(`Found ${songItems.length} songs in plan ${plan.id}`)
+              } catch (itemsError: any) {
+                console.error(`Error fetching items for plan ${plan.id}:`, itemsError.message)
+
+                // Continue with next plan even if this one fails
+                plan._items = []
+              }
+            }
+
             // For each plan, dump the structure to help debug
             servicePlansData.forEach((plan: any, index: number) => {
               console.log(
@@ -213,10 +253,8 @@ export async function GET(request: Request) {
               )
               console.log(`Relationships:`, Object.keys(plan.relationships || {}))
 
-              // Check for songs
-              const songRelationships = plan.relationships?.songs?.data || []
-
-              console.log(`Song relationships: ${songRelationships.length}`)
+              // Check for items
+              console.log(`Items: ${plan._items?.length || 0}`)
 
               // Check for teams
               const teamRelationships = plan.relationships?.teams?.data || []
@@ -304,50 +342,57 @@ export async function GET(request: Request) {
           })
           .filter(Boolean)
 
-        // Find songs
-        const songIds = plan.relationships.songs?.data || []
+        // Find songs from plan items
+        const songs = []
 
-        console.log(`Song IDs found: ${songIds.length}`)
+        if (plan._items) {
+          // Loop through items to find songs
+          for (const item of plan._items) {
+            if (item.attributes.item_type === 'song' && item.relationships?.song?.data?.id) {
+              const songId = item.relationships.song.data.id
+              const songItem = allIncludedData.find(included => included.type === 'Song' && included.id === songId)
 
-        const songs = songIds
-          .map((songId: any) => {
-            const songItem = allIncludedData.find(item => item.type === 'Song' && item.id === songId.id)
+              if (songItem) {
+                // Get arrangement data if available
+                let arrangementData = {}
 
-            if (!songItem) {
-              console.log(`Could not find song with ID: ${songId.id}`)
+                if (item.relationships?.arrangement?.data?.id) {
+                  const arrangementId = item.relationships.arrangement.data.id
 
-              return null
-            }
+                  const arrangement = allIncludedData.find(
+                    included => included.type === 'Arrangement' && included.id === arrangementId
+                  )
 
-            // Get arrangement data if available
-            let arrangementData = {}
-            const arrangementIds = songItem.relationships?.arrangements?.data || []
-
-            if (arrangementIds.length > 0) {
-              const arrangement = allIncludedData.find(
-                item => item.type === 'Arrangement' && item.id === arrangementIds[0].id
-              )
-
-              if (arrangement) {
-                arrangementData = {
-                  arrangementId: arrangement.id,
-                  key: arrangement.attributes.key_name,
-                  bpm: arrangement.attributes.bpm
+                  if (arrangement) {
+                    arrangementData = {
+                      arrangementId: arrangement.id,
+                      key: arrangement.attributes.key_name,
+                      bpm: arrangement.attributes.bpm
+                    }
+                  }
                 }
+
+                songs.push({
+                  id: songItem.id,
+                  title: songItem.attributes.title,
+                  author: songItem.attributes.author,
+                  ccli: songItem.attributes.ccli_number,
+                  sequence: item.attributes.sequence || null,
+                  ...arrangementData
+                })
               }
             }
+          }
+        }
 
-            console.log(`Found song: ${songItem.id} - ${songItem.attributes.title}`)
+        // Sort songs by sequence if available
+        songs.sort((a, b) => {
+          if (a.sequence === null && b.sequence === null) return 0
+          if (a.sequence === null) return 1
+          if (b.sequence === null) return -1
 
-            return {
-              id: songItem.id,
-              title: songItem.attributes.title,
-              author: songItem.attributes.author,
-              ccli: songItem.attributes.ccli_number,
-              ...arrangementData
-            }
-          })
-          .filter(Boolean)
+          return a.sequence - b.sequence
+        })
 
         // Find teams involved
         const teamIds = plan.relationships.teams?.data || []
