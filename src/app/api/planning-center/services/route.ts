@@ -34,27 +34,66 @@ export async function GET(request: Request) {
     let allIncludedData: any[] = [] // Initialize an array to collect all included data
 
     try {
-      // Get plans from today forward, include teams, team_members, and arrangements
-      let nextPage = `${BASE_URL}/service_types/plans?filter=future&include=plan_times,teams,team_members,songs,arrangements&per_page=50`
+      // First, get all service types
+      console.log('Fetching service types...')
 
-      while (nextPage) {
-        const response = await axios.get(nextPage, {
-          headers: {
-            Authorization: `Bearer ${token}`
+      const serviceTypesResponse = await axios.get(`${BASE_URL}/service_types`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        timeout: 15000
+      })
+
+      const serviceTypes = serviceTypesResponse.data.data || []
+
+      console.log(`Found ${serviceTypes.length} service types`)
+
+      if (serviceTypes.length === 0) {
+        return NextResponse.json(
+          {
+            error: 'No service types found in Planning Center',
+            message: 'Please ensure you have service types configured in Planning Center Services',
+            step: 'fetching_service_types'
           },
-          timeout: 15000 // Set a timeout of 15 seconds
-        })
+          { status: 404 }
+        )
+      }
 
-        const servicePlansData = response.data.data || []
-        const includedData = response.data.included || [] // Collect included data
+      // Then, get plans for each service type
+      for (const serviceType of serviceTypes) {
+        const serviceTypeId = serviceType.id
 
-        if (servicePlansData.length > 0) {
-          allServicePlans = [...allServicePlans, ...servicePlansData]
-          allIncludedData = [...allIncludedData, ...includedData] // Collect included data
-          progress = allServicePlans.length // Update progress
+        console.log(`Fetching plans for service type ${serviceTypeId}`)
+
+        // Get plans from today forward, include teams, team_members, and arrangements
+        let nextPage = `${BASE_URL}/service_types/${serviceTypeId}/plans?filter=future&include=plan_times,teams,team_members,songs,arrangements&per_page=50`
+
+        while (nextPage) {
+          const response = await axios.get(nextPage, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            timeout: 15000 // Set a timeout of 15 seconds
+          })
+
+          const servicePlansData = response.data.data || []
+          const includedData = response.data.included || [] // Collect included data
+
+          if (servicePlansData.length > 0) {
+            console.log(`Found ${servicePlansData.length} plans for service type ${serviceTypeId}`)
+            allServicePlans = [...allServicePlans, ...servicePlansData]
+            allIncludedData = [...allIncludedData, ...includedData] // Collect included data
+            progress = allServicePlans.length // Update progress
+          }
+
+          nextPage = response.data.links?.next || null // Update nextPage with the next link
         }
+      }
 
-        nextPage = response.data.links?.next || null // Update nextPage with the next link
+      if (allServicePlans.length === 0) {
+        console.log('No future service plans found')
+
+        return NextResponse.json([]) // Return empty array if no plans found
       }
     } catch (apiError: any) {
       console.error('Error fetching service plans:', apiError.message)
@@ -63,7 +102,8 @@ export async function GET(request: Request) {
         {
           error: 'Failed to fetch service plans from Planning Center',
           message: apiError.message,
-          step: 'fetching_plans'
+          step: 'fetching_plans',
+          url: apiError.config?.url || 'unknown'
         },
         { status: apiError.response?.status || 500 }
       )
