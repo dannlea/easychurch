@@ -25,19 +25,6 @@ import MenuItem from '@mui/material/MenuItem'
 import PrintIcon from '@mui/icons-material/Print'
 import axios from 'axios'
 
-// Define the structure of a birthday record
-interface BirthdayRecord {
-  id: string
-  firstName: string
-  lastName: string
-  birthdate: string
-  ageNext: number | null
-  email: string
-  address: string
-  gender: string
-  profilePicture: string
-}
-
 const months = [
   'January',
   'February',
@@ -54,7 +41,7 @@ const months = [
 ]
 
 // Helper function to format the date
-const formatBirthdate = (dateStr: string) => {
+const formatAnniversaryDate = (dateStr: string) => {
   if (dateStr === 'Unknown') return dateStr
 
   try {
@@ -69,8 +56,9 @@ const formatBirthdate = (dateStr: string) => {
 
     const month = date.getMonth()
     const day = date.getDate()
+    const year = date.getFullYear()
 
-    return `${months[month]} ${day}, ${new Date().getFullYear()}`
+    return `${months[month]} ${day}, ${year}`
   } catch (error) {
     console.error('Error formatting date:', error)
 
@@ -78,53 +66,19 @@ const formatBirthdate = (dateStr: string) => {
   }
 }
 
-// Helper function to get background color based on gender and age
-const getRowStyle = (gender: string, age: number | null) => {
-  // Base colors with opacity
-  const femaleBase = 'rgba(255, 241, 241'
-  const maleBase = 'rgba(241, 248, 255'
-  const undefinedBase = 'rgba(245, 245, 245'
-
-  // Get base color based on gender
-  let baseColor = undefinedBase
-
-  if (gender.toLowerCase() === 'female') {
-    baseColor = femaleBase
-  } else if (gender.toLowerCase() === 'male') {
-    baseColor = maleBase
-  }
-
-  // Calculate opacity based on age
-  let opacity = 1
-
-  if (age !== null) {
-    if (age <= 11) {
-      opacity = 0.3 // Light
-    } else if (age <= 18) {
-      opacity = 0.6 // Medium
-    } else {
-      opacity = 0.9 // Dark
-    }
-  }
-
-  return {
-    backgroundColor: `${baseColor}, ${opacity})`
-  }
-}
-
-const BirthdayTable = () => {
+const AnniversaryTable = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [data, setData] = useState<BirthdayRecord[]>([])
+  const [data, setData] = useState<any[]>([])
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
 
-  // Function to fetch birthdays from Planning Center
-  const fetchBirthdays = async (retryCount = 0) => {
+  // Function to fetch anniversaries from Planning Center
+  const fetchAnniversaries = async (retryCount = 0) => {
     try {
       setLoading(true)
       setError(null)
 
-      console.log('Fetching birthdays from Planning Center...')
+      console.log('Fetching anniversaries from Planning Center...')
 
       const response = await axios.get('/api/planning-center/people')
 
@@ -132,10 +86,13 @@ const BirthdayTable = () => {
         throw new Error('Invalid data format received from API')
       }
 
-      setData(response.data)
+      // Filter for people with anniversaries
+      const peopleWithAnniversaries = response.data.filter(person => person.anniversaryDate !== 'Unknown')
+
+      setData(peopleWithAnniversaries)
       setLoading(false)
     } catch (error: any) {
-      console.error('Error fetching birthdays:', error)
+      console.error('Error fetching anniversaries:', error)
 
       if (error.response?.status === 401 && retryCount < 1) {
         console.log('Unauthorized, redirecting to Planning Center auth...')
@@ -144,13 +101,13 @@ const BirthdayTable = () => {
         return
       }
 
-      setError(`Failed to load birthday data: ${error.message}`)
+      setError(`Failed to load anniversary data: ${error.message}`)
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchBirthdays()
+    fetchAnniversaries()
   }, [])
 
   const handlePrint = () => {
@@ -166,14 +123,12 @@ const BirthdayTable = () => {
   }
 
   const filteredData = data.filter(person => {
-    if (person.birthdate === 'Unknown') return false
-
     try {
       // Create date with noon time to avoid timezone issues
-      const date = new Date(person.birthdate + 'T12:00:00')
+      const date = new Date(person.anniversaryDate + 'T12:00:00')
 
       if (isNaN(date.getTime())) {
-        console.error('Invalid date during filtering:', person.birthdate)
+        console.error('Invalid date during filtering:', person.anniversaryDate)
 
         return false
       }
@@ -191,11 +146,11 @@ const BirthdayTable = () => {
   const sortedData = [...filteredData].sort((a, b) => {
     try {
       // Create dates with noon time to avoid timezone issues
-      const dateA = new Date(a.birthdate + 'T12:00:00')
-      const dateB = new Date(b.birthdate + 'T12:00:00')
+      const dateA = new Date(a.anniversaryDate + 'T12:00:00')
+      const dateB = new Date(b.anniversaryDate + 'T12:00:00')
 
       if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
-        console.error('Invalid date during sorting:', { dateA: a.birthdate, dateB: b.birthdate })
+        console.error('Invalid date during sorting:', { dateA: a.anniversaryDate, dateB: b.anniversaryDate })
 
         return 0
       }
@@ -215,10 +170,10 @@ const BirthdayTable = () => {
     <CardContent>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, gap: 2 }}>
         <FormControl sx={{ flex: 1 }}>
-          <InputLabel sx={{ fontSize: '1.1rem' }}>Select Birthday Month</InputLabel>
+          <InputLabel sx={{ fontSize: '1.1rem' }}>Select Anniversary Month</InputLabel>
           <Select
             value={selectedMonth.toString()}
-            label='Select Birthday Month'
+            label='Select Anniversary Month'
             onChange={handleMonthChange}
             sx={{
               fontSize: '1.25rem',
@@ -261,7 +216,7 @@ const BirthdayTable = () => {
           <Alert severity='error' sx={{ mb: 2 }}>
             {error}
           </Alert>
-          <Button variant='contained' onClick={() => fetchBirthdays()} sx={{ mr: 1 }}>
+          <Button variant='contained' onClick={() => fetchAnniversaries()} sx={{ mr: 1 }}>
             Retry
           </Button>
           <Button variant='outlined' onClick={handleReconnect}>
@@ -270,7 +225,7 @@ const BirthdayTable = () => {
         </Box>
       ) : sortedData.length > 0 ? (
         <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
-          <Table sx={{ minWidth: 650 }} aria-label='birthdays table'>
+          <Table sx={{ minWidth: 650 }} aria-label='anniversaries table'>
             <TableHead>
               <TableRow>
                 <TableCell
@@ -300,7 +255,7 @@ const BirthdayTable = () => {
                     }
                   }}
                 >
-                  BIRTHDAY
+                  ANNIVERSARY
                 </TableCell>
                 <TableCell
                   sx={{
@@ -315,7 +270,7 @@ const BirthdayTable = () => {
                     }
                   }}
                 >
-                  AGE
+                  YEARS
                 </TableCell>
                 <TableCell
                   sx={{
@@ -338,7 +293,6 @@ const BirthdayTable = () => {
                 <TableRow
                   key={person.id}
                   sx={{
-                    ...getRowStyle(person.gender, person.ageNext),
                     '&:hover': { filter: 'brightness(0.95)' },
                     height: '45px',
                     '& > td': {
@@ -440,7 +394,7 @@ const BirthdayTable = () => {
                       }
                     }}
                   >
-                    {formatBirthdate(person.birthdate)}
+                    {formatAnniversaryDate(person.anniversaryDate)}
                   </TableCell>
                   <TableCell
                     sx={{
@@ -451,7 +405,7 @@ const BirthdayTable = () => {
                       }
                     }}
                   >
-                    {person.ageNext}
+                    {person.yearsMarried}
                   </TableCell>
                   <TableCell
                     sx={{
@@ -470,7 +424,7 @@ const BirthdayTable = () => {
         </TableContainer>
       ) : (
         <Box sx={{ textAlign: 'center', py: 5 }}>
-          <Typography variant='body1'>No birthdays found for {months[selectedMonth]}.</Typography>
+          <Typography variant='body1'>No anniversaries found for {months[selectedMonth]}.</Typography>
         </Box>
       )}
       {data.length > 0 && (
@@ -485,8 +439,8 @@ const BirthdayTable = () => {
             }
           }}
         >
-          There are {data.filter(p => p.birthdate === 'Unknown').length} users in your People database without
-          birthdays.
+          There are {data.filter(p => p.anniversaryDate === 'Unknown').length} users in your People database without
+          anniversaries.
         </Typography>
       )}
     </CardContent>
@@ -524,4 +478,4 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(style)
 }
 
-export default BirthdayTable
+export default AnniversaryTable
