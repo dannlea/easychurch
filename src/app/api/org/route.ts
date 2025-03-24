@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server'
 
 import type { JwtPayload } from 'jsonwebtoken'
 
-import pool from '../../../****api/db'
-import { verifyAuth, unauthorized, forbidden } from '../../../****api/auth-utils'
+import pool from '../db'
+import { verifyAuth, unauthorized, forbidden } from '../auth-utils'
 
 // Define a type for our auth user
 interface AuthUser extends JwtPayload {

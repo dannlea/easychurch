@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import '@/styles/print.css'
 
 // MUI Imports
 import CardContent from '@mui/material/CardContent'
@@ -213,7 +214,10 @@ const BirthdayTable = () => {
 
   return (
     <CardContent>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, gap: 2 }}>
+      <Box
+        sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, gap: 2 }}
+        className='no-print'
+      >
         <FormControl sx={{ flex: 1 }}>
           <InputLabel sx={{ fontSize: '1.1rem' }}>Select Birthday Month</InputLabel>
           <Select
@@ -252,6 +256,11 @@ const BirthdayTable = () => {
         </Button>
       </Box>
 
+      {/* Print-only title */}
+      <Box className='print-title' sx={{ display: 'none', '@media print': { display: 'block' } }}>
+        {months[selectedMonth]} Birthdays
+      </Box>
+
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
           <CircularProgress />
@@ -270,19 +279,14 @@ const BirthdayTable = () => {
         </Box>
       ) : sortedData.length > 0 ? (
         <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
-          <Table sx={{ minWidth: 650 }} aria-label='birthdays table'>
+          <Table className='print-table' sx={{ minWidth: 650 }} aria-label='birthdays table'>
             <TableHead>
               <TableRow>
                 <TableCell
                   sx={{
                     fontSize: '0.875rem',
                     fontWeight: 600,
-                    width: '30%',
-                    '@media print': {
-                      fontSize: '12px',
-                      padding: '8px',
-                      width: '25%'
-                    }
+                    width: '30%'
                   }}
                 >
                   NAME
@@ -292,12 +296,7 @@ const BirthdayTable = () => {
                     fontSize: '0.875rem',
                     fontWeight: 600,
                     width: '15%',
-                    textAlign: 'center',
-                    '@media print': {
-                      fontSize: '12px',
-                      padding: '8px',
-                      width: '20%'
-                    }
+                    textAlign: 'center'
                   }}
                 >
                   BIRTHDAY
@@ -306,13 +305,8 @@ const BirthdayTable = () => {
                   sx={{
                     fontSize: '0.875rem',
                     fontWeight: 600,
-                    width: '8%',
-                    textAlign: 'center',
-                    '@media print': {
-                      fontSize: '12px',
-                      padding: '8px',
-                      width: '8%'
-                    }
+                    width: '10%',
+                    textAlign: 'center'
                   }}
                 >
                   AGE
@@ -321,12 +315,7 @@ const BirthdayTable = () => {
                   sx={{
                     fontSize: '0.875rem',
                     fontWeight: 600,
-                    width: '47%',
-                    '@media print': {
-                      fontSize: '12px',
-                      padding: '8px',
-                      width: '47%'
-                    }
+                    width: '45%'
                   }}
                 >
                   MAILING ADDRESS
@@ -343,25 +332,12 @@ const BirthdayTable = () => {
                     height: '45px',
                     '& > td': {
                       padding: '6px 12px',
-                      height: 'inherit',
-                      '@media print': {
-                        padding: '8px',
-                        height: 'auto'
-                      }
+                      height: 'inherit'
                     }
                   }}
                 >
                   <TableCell>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        gap: 2,
-                        alignItems: 'flex-start',
-                        '@media print': {
-                          gap: 1
-                        }
-                      }}
-                    >
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
                       <Avatar
                         src={person.profilePicture !== 'No avatar' ? person.profilePicture : ''}
                         alt={`${person.firstName} ${person.lastName}`}
@@ -369,23 +345,12 @@ const BirthdayTable = () => {
                           width: 34,
                           height: 34,
                           flexShrink: 0,
-                          '@media print': {
-                            display: 'none'
-                          }
+                          '@media print': { display: 'none' }
                         }}
                       >
                         {person.firstName.charAt(0)}
                       </Avatar>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 0.5,
-                          '@media print': {
-                            gap: 0.1
-                          }
-                        }}
-                      >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <Typography
                           component='a'
                           href={`https://people.planningcenteronline.com/people/${person.id}`}
@@ -396,13 +361,10 @@ const BirthdayTable = () => {
                             fontWeight: 500,
                             color: 'inherit',
                             textDecoration: 'none',
-                            '&:hover': {
-                              textDecoration: 'underline'
-                            },
+                            '&:hover': { textDecoration: 'underline' },
                             '@media print': {
-                              fontSize: '11px',
-                              lineHeight: 1.1,
-                              fontWeight: 600
+                              textDecoration: 'none',
+                              '&:hover': { textDecoration: 'none' }
                             }
                           }}
                         >
@@ -412,17 +374,13 @@ const BirthdayTable = () => {
                           <Typography
                             component='a'
                             href={`mailto:${person.email}`}
+                            className='no-print'
                             sx={{
                               color: 'text.secondary',
                               fontSize: '0.75rem',
                               fontStyle: 'italic',
                               textDecoration: 'none',
-                              '&:hover': {
-                                textDecoration: 'underline'
-                              },
-                              '@media print': {
-                                display: 'none'
-                              }
+                              '&:hover': { textDecoration: 'underline' }
                             }}
                           >
                             {person.email}
@@ -431,38 +389,9 @@ const BirthdayTable = () => {
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell
-                    sx={{
-                      fontSize: '0.9rem',
-                      textAlign: 'center',
-                      '@media print': {
-                        fontSize: '12px'
-                      }
-                    }}
-                  >
-                    {formatBirthdate(person.birthdate)}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontSize: '0.9rem',
-                      textAlign: 'center',
-                      '@media print': {
-                        fontSize: '12px'
-                      }
-                    }}
-                  >
-                    {person.ageNext}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontSize: '0.9rem',
-                      '@media print': {
-                        fontSize: '12px'
-                      }
-                    }}
-                  >
-                    {person.address}
-                  </TableCell>
+                  <TableCell sx={{ textAlign: 'center' }}>{formatBirthdate(person.birthdate)}</TableCell>
+                  <TableCell sx={{ textAlign: 'center' }}>{person.ageNext}</TableCell>
+                  <TableCell>{person.address}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -474,54 +403,13 @@ const BirthdayTable = () => {
         </Box>
       )}
       {data.length > 0 && (
-        <Typography
-          variant='body2'
-          color='text.secondary'
-          sx={{
-            mt: 2,
-            textAlign: 'center',
-            '@media print': {
-              display: 'none'
-            }
-          }}
-        >
+        <Typography variant='body2' color='text.secondary' className='no-print' sx={{ mt: 2, textAlign: 'center' }}>
           There are {data.filter(p => p.birthdate === 'Unknown').length} users in your People database without
           birthdays.
         </Typography>
       )}
     </CardContent>
   )
-}
-
-// Add global print styles at the top of the file
-const globalPrintStyles = `
-  @media print {
-    @page {
-      margin: 0.5cm;
-    }
-    body * {
-      visibility: hidden;
-    }
-    .MuiCard-root, .MuiCard-root * {
-      visibility: visible;
-    }
-    .MuiCard-root {
-      position: absolute;
-      left: 0;
-      top: 0;
-    }
-    .MuiButton-root, .MuiFormControl-root {
-      display: none !important;
-    }
-  }
-`
-
-// Add the style tag to the document
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style')
-
-  style.innerHTML = globalPrintStyles
-  document.head.appendChild(style)
 }
 
 export default BirthdayTable

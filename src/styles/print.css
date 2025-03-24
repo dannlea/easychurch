@@ -1,0 +1,148 @@
+@media print {
+  /* Reset everything */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    background-color: transparent !important;
+  }
+
+  /* Reset page margins */
+  @page {
+    margin: 1cm;
+  }
+
+  /* Basic layout */
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    block-size: auto !important;
+    inline-size: 100% !important;
+  }
+
+  /* Hide navigation, header, footer and other non-content elements */
+  nav,
+  header,
+  footer,
+  aside,
+  .MuiDrawer-root,
+  .MuiAppBar-root,
+  .navigation-wrapper,
+  .header-wrapper,
+  .footer-wrapper,
+  .sidebar,
+  .MuiTabs-root,
+  .MuiTabList-root,
+  button,
+  select,
+  .MuiFormControl-root,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Show necessary containers */
+  body > div,
+  .MuiGrid-root,
+  .MuiCard-root,
+  .MuiTabContext-root,
+  .MuiTabPanel-root,
+  .MuiCardContent-root {
+    display: block !important;
+    visibility: visible !important;
+    block-size: auto !important;
+    overflow: visible !important;
+    position: static !important;
+    transform: none !important;
+  }
+
+  /* Main content area */
+  main,
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    inline-size: 100% !important;
+    position: static !important;
+  }
+
+  /* Table container */
+  .MuiTableContainer-root {
+    display: block !important;
+    inline-size: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Table styles */
+  .MuiTable-root {
+    inline-size: 100% !important;
+    border-collapse: collapse !important;
+    display: table !important;
+  }
+
+  /* Table header and body */
+  .MuiTableHead-root,
+  .MuiTableBody-root {
+    display: table-header-group !important;
+    inline-size: 100% !important;
+  }
+
+  .MuiTableBody-root {
+    display: table-row-group !important;
+  }
+
+  /* Table row */
+  .MuiTableRow-root {
+    display: table-row !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Table cell */
+  .MuiTableCell-root {
+    display: table-cell !important;
+    padding: 8px !important;
+    border-block-end: 1px solid #ddd !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    text-align: start !important;
+  }
+
+  /* Table header cell */
+  .MuiTableHead-root .MuiTableCell-root {
+    font-weight: 600 !important;
+    background-color: #f5f5f5 !important;
+  }
+
+  /* Typography */
+  .MuiTypography-root {
+    color: black !important;
+    font-size: 12px !important;
+  }
+
+  /* Links */
+  a {
+    color: black !important;
+    text-decoration: none !important;
+  }
+
+  /* Show print title */
+  .print-title {
+    display: block !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    text-align: center !important;
+    margin-block-end: 24px !important;
+  }
+
+  /* Row colors */
+  .MuiTableRow-root[style*='background'] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Hide avatars in print */
+  .MuiAvatar-root {
+    display: none !important;
+  }
+}
