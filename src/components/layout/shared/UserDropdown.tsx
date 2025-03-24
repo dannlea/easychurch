@@ -54,6 +54,8 @@ const UserDropdown = () => {
     if (user?.profilePicture) {
       // Handle both relative and absolute paths
       let src = user.profilePicture
+      const isDev = process.env.NODE_ENV === 'development'
+      const isDebugMode = false // Set to true only when debugging profile picture issues
 
       // Fix profile picture path if needed
       if (src && !src.startsWith('data:') && !src.startsWith('http')) {
@@ -62,35 +64,44 @@ const UserDropdown = () => {
           ? process.env.NEXT_PUBLIC_LOCAL_SERVER.replace(/\/$/, '')
           : 'http://localhost:3001'
 
-        // Log the backend URL for debugging
-        if (process.env.NODE_ENV === 'development') {
+        // Log only when in debug mode
+        if (isDev && isDebugMode) {
           console.log('Backend URL for UserDropdown:', backendUrl)
         }
 
         // Remove any leading slashes to start fresh
-        src = src.replace(/^\/+/, '')
+        const cleanPath = src.replace(/^\/+/, '')
 
-        // If it's an assets path, make sure it has the correct format
-        if (src.startsWith('assets/')) {
-          src = `api/assets/${src.substring('assets/'.length)}`
-        } else if (!src.startsWith('api/')) {
-          src = `api/${src}`
+        // Log only when in debug mode
+        if (isDev && isDebugMode) {
+          console.log('Original profile picture path:', src)
+          console.log('Cleaned path:', cleanPath)
         }
 
-        // Now add a single leading slash
-        src = `/${src}`
+        // Determine the final path based on where the image is located
+        let finalPath
 
-        // Log the final path for debugging
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Final profile picture path:', `${backendUrl}${src}`)
+        if (cleanPath.startsWith('assets/')) {
+          // Handle path starting with assets/ - this can be accessed directly
+          finalPath = `/${cleanPath}`
+        } else if (cleanPath.startsWith('uploads/')) {
+          // Handle path starting with uploads/ - this can be accessed directly
+          finalPath = `/${cleanPath}`
+        } else if (!cleanPath.startsWith('api/')) {
+          // For other paths, assume they should go through the API
+          finalPath = `/api/${cleanPath}`
+        } else {
+          // If it already starts with api/, leave it as is
+          finalPath = `/${cleanPath}`
         }
 
-        src = `${backendUrl}${src}`
-      }
+        // Add the backend URL
+        src = `${backendUrl}${finalPath}`
 
-      // Production code shouldn't log sensitive information
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Setting profile picture path:', src)
+        // Log only when in debug mode
+        if (isDev && isDebugMode) {
+          console.log('Final profile picture path:', src)
+        }
       }
 
       // Temporarily create an image to test loading
@@ -99,17 +110,9 @@ const UserDropdown = () => {
       img.onload = () => {
         setImgSrc(src)
         setImgError(false)
-
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Profile image successfully loaded')
-        }
       }
 
       img.onerror = () => {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Failed to preload profile picture')
-        }
-
         setImgError(true)
       }
 

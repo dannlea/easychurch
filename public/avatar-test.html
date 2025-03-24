@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Avatar Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .test-image {
+        margin: 20px 0;
+        padding: 10px;
+        border: 1px solid #ddd;
+      }
+      img {
+        max-width: 200px;
+        max-height: 200px;
+        display: block;
+        margin-top: 10px;
+      }
+      h2 {
+        margin-top: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Avatar Access Test</h1>
+    <p>This page tests various ways to access avatar images to diagnose path issues.</p>
+
+    <h2>Direct Access to Assets Directory</h2>
+    <div class="test-image">
+      <div>Path: /assets/avatars/avatar-ac4be22e-c89f-4d5b-a9b1-378f943196c5.png</div>
+      <img src="/assets/avatars/avatar-ac4be22e-c89f-4d5b-a9b1-378f943196c5.png" alt="Avatar Test 1" />
+    </div>
+
+    <div class="test-image">
+      <div>Path: /assets/avatars/avatar-7b3ce02e-d838-45bc-a024-e86c30b0dda8.png</div>
+      <img src="/assets/avatars/avatar-7b3ce02e-d838-45bc-a024-e86c30b0dda8.png" alt="Avatar Test 2" />
+    </div>
+
+    <h2>Direct Access to Uploads Directory</h2>
+    <div class="test-image">
+      <div>Path: /uploads/avatars/avatar-ac4be22e-c89f-4d5b-a9b1-378f943196c5.png</div>
+      <img src="/uploads/avatars/avatar-ac4be22e-c89f-4d5b-a9b1-378f943196c5.png" alt="Avatar Test 3" />
+    </div>
+
+    <div class="test-image">
+      <div>Path: /uploads/avatars/avatar-7b3ce02e-d838-45bc-a024-e86c30b0dda8.png</div>
+      <img src="/uploads/avatars/avatar-7b3ce02e-d838-45bc-a024-e86c30b0dda8.png" alt="Avatar Test 4" />
+    </div>
+
+    <h2>Through API</h2>
+    <div class="test-image">
+      <div>Path: /api/assets/avatar-ac4be22e-c89f-4d5b-a9b1-378f943196c5.png</div>
+      <img src="/api/assets/avatar-ac4be22e-c89f-4d5b-a9b1-378f943196c5.png" alt="Avatar Test 5" />
+    </div>
+
+    <div class="test-image">
+      <div>Path: /api/assets/avatar-7b3ce02e-d838-45bc-a024-e86c30b0dda8.png</div>
+      <img src="/api/assets/avatar-7b3ce02e-d838-45bc-a024-e86c30b0dda8.png" alt="Avatar Test 6" />
+    </div>
+
+    <script>
+      // Add image load/error event listeners
+      document.querySelectorAll('img').forEach(img => {
+        img.addEventListener('load', () => {
+          console.log(`Image loaded successfully: ${img.src}`)
+          img.insertAdjacentHTML('afterend', '<div style="color: green;">✓ Loaded</div>')
+        })
+
+        img.addEventListener('error', () => {
+          console.error(`Failed to load image: ${img.src}`)
+          img.insertAdjacentHTML('afterend', '<div style="color: red;">✗ Failed to load</div>')
+        })
+      })
+    </script>
+  </body>
+</html>

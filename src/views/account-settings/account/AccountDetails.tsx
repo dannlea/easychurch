@@ -1,11 +1,14 @@
 'use client'
 
 // React Imports
-import { useState, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
+import { useState, useEffect } from 'react'
+
+import { useSearchParams, useRouter } from 'next/navigation'
+
+import type { SelectChangeEvent } from '@mui/material/Select'
 
 // Next Imports
-import { useSearchParams, useRouter } from 'next/navigation'
 
 // MUI Imports
 import Grid from '@mui/material/Grid'
@@ -21,7 +24,6 @@ import MenuItem from '@mui/material/MenuItem'
 import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
-import type { SelectChangeEvent } from '@mui/material/Select'
 import { toast, Toaster } from 'react-hot-toast'
 
 // Import utility functions
@@ -64,12 +66,11 @@ const AccountDetails = () => {
     currency: 'usd' // Default value
   })
 
-  const [fileInput, setFileInput] = useState<File | null>(null)
   const [imgSrc, setImgSrc] = useState<string>('/images/placeholder.png')
   const [language, setLanguage] = useState<string[]>(['English'])
 
   // Get user context and search params
-  const { user } = useUser()
+  const { user, setUser } = useUser()
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -155,16 +156,30 @@ const AccountDetails = () => {
         if (userData.profile_picture) {
           const imgPath = userData.profile_picture
 
-          // Handle assets path
-          if (imgPath.startsWith('/assets/')) {
-            setImgSrc(buildApiUrl(`assets/${imgPath.substring(8)}`))
-          } else if (imgPath.startsWith('/images/')) {
-            // Public images path
+          // Only log in development mode and limit to one log
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Profile picture path:', imgPath)
+          }
+
+          if (imgPath.startsWith('assets/')) {
+            // Direct path to assets folder (new format)
+            setImgSrc(`/${imgPath}`)
+          } else if (imgPath.startsWith('/assets/')) {
+            // Path already has leading slash
+            setImgSrc(imgPath)
+          } else if (imgPath.startsWith('/uploads/')) {
+            // Handle uploads path
+            setImgSrc(imgPath)
+          } else if (imgPath.startsWith('/api/')) {
+            // API path
             setImgSrc(imgPath)
           } else {
-            // Fallback to placeholder
-            setImgSrc('/images/placeholder.png')
+            // Try to infer the correct path
+            setImgSrc(`/assets/avatars/${imgPath.split('/').pop()}`)
           }
+        } else {
+          // Fallback to placeholder
+          setImgSrc('/images/placeholder.png')
         }
 
         setIsLoading(false)
@@ -194,58 +209,116 @@ const AccountDetails = () => {
     const reader = new FileReader()
     const { files } = file.target as HTMLInputElement
 
-    if (files && files.length > 0) {
-      reader.onload = () => setImgSrc(reader.result as string)
-      reader.readAsDataURL(files[0])
+    // Only log in development mode
+    const isDev = process.env.NODE_ENV === 'development'
 
-      if (reader.result !== null) {
-        setFileInput(files[0])
+    if (!files || files.length === 0) {
+      if (isDev) console.error('No files selected')
+      toast.error('No file selected')
+
+      return
+    }
+
+    const selectedFile = files[0]
+
+    if (isDev) console.log(`Selected file: ${selectedFile.name}`)
+
+    // Show local preview immediately using FileReader
+    reader.onload = () => {
+      setImgSrc(reader.result as string)
+    }
+
+    reader.onerror = () => {
+      console.error('Error reading file')
+      toast.error('Error reading file')
+    }
+
+    reader.readAsDataURL(selectedFile)
+
+    try {
+      // Get user ID from URL params if available, otherwise use user context
+      const urlUserId = searchParams.get('id')
+      const userId = urlUserId || (user?.id ? String(user.id) : null)
+
+      if (!userId) {
+        console.error('No user ID available for update')
+        toast.error('Could not determine user ID')
+        throw new Error('No user ID available for update')
       }
 
-      // Create a new FormData instance
-      const formDataToSend = new FormData()
+      // Send the file to the avatar endpoint
+      const token = localStorage.getItem('token')
+      const avatarUrl = `/api/users/${userId}/avatar`
 
-      // Append the current form data
-      formDataToSend.append('firstName', formData.firstName || '')
-      formDataToSend.append('lastName', formData.lastName || '')
-      formDataToSend.append('email', formData.email || '')
-      formDataToSend.append('phoneNumber', formData.phoneNumber?.toString() || '')
-      formDataToSend.append('address', formData.address || '')
-      formDataToSend.append('state', formData.state || '')
-      formDataToSend.append('zipCode', formData.zipCode || '')
-      formDataToSend.append('country', formData.country || '')
-      formDataToSend.append('timezone', formData.timezone || '')
-      formDataToSend.append('currency', formData.currency || '')
+      if (isDev) console.log('Uploading avatar')
 
-      // Append the file
-      formDataToSend.append('avatar', files[0])
+      // Read file as ArrayBuffer for direct binary upload
+      const arrayBuffer = await selectedFile.arrayBuffer()
+
+      // Set up request options for direct binary upload
+      const requestOptions: RequestInit = {
+        method: 'POST',
+        headers: {
+          'Content-Type': selectedFile.type
+        },
+        body: arrayBuffer
+      }
+
+      // Add auth token if available
+      if (token) {
+        requestOptions.headers = {
+          ...requestOptions.headers,
+          Authorization: `Bearer ${token}`
+        }
+      }
+
+      // Send the request
+      const response = await fetch(avatarUrl, requestOptions)
+
+      let responseData
 
       try {
-        // Get user ID from URL params if available, otherwise use user context
-        const urlUserId = searchParams.get('id')
-        const userId = urlUserId || (user?.id ? String(user.id) : null)
+        responseData = await response.json()
+        if (isDev) console.log('Upload response data received')
+      } catch (parseError) {
+        console.error('Error parsing server response')
+        toast.error('Error processing server response')
 
-        // Send the file and form data to the server
-        const userApiUrl = userId ? buildApiUrl(`users/${userId}`) : buildApiUrl('users/me')
-
-        const response = await fetch(userApiUrl, {
-          method: 'PUT',
-          body: formDataToSend
-        })
-
-        if (response.ok) {
-          console.log('User avatar updated successfully')
-        } else {
-          console.error('Failed to update user avatar')
-        }
-      } catch (error) {
-        console.error('Error updating user avatar:', error)
+        return
       }
+
+      if (response.ok) {
+        if (responseData.profile_picture) {
+          // Update the image source immediately
+          if (responseData.profile_picture.startsWith('assets/')) {
+            setImgSrc(`/${responseData.profile_picture}`)
+          } else {
+            setImgSrc(responseData.profile_picture)
+          }
+
+          // Update the user context to refresh the avatar globally
+          if (user) {
+            setUser({
+              ...user,
+              profilePicture: responseData.profile_picture
+            })
+
+            if (isDev) console.log('User context updated with new avatar')
+          }
+        }
+
+        toast.success('Avatar updated successfully')
+      } else {
+        console.error('Failed to update avatar')
+        toast.error(responseData.error || 'Failed to update avatar')
+      }
+    } catch (error) {
+      console.error('Error uploading avatar')
+      toast.error('Error uploading avatar')
     }
   }
 
   const handleFileInputReset = () => {
-    setFileInput(null)
     setImgSrc('/images/avatars/1.png')
   }
 
@@ -265,7 +338,8 @@ const AccountDetails = () => {
 
       const token = localStorage.getItem('token')
 
-      const response = await fetch(buildApiUrl(`users/${userId}`), {
+      // Map the form fields to the database column names
+      const response = await fetch(`/api/users/${userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -288,45 +362,18 @@ const AccountDetails = () => {
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to update user: ${response.status} ${response.statusText}`)
+        const errorData = await response.json()
+
+        throw new Error(`Failed to update user: ${errorData.error || response.statusText}`)
       }
 
-      // Update the file if it was changed
-      if (fileInput) {
-        const fileFormData = new FormData()
-
-        fileFormData.append('avatar', fileInput)
-
-        const fileResponse = await fetch(buildApiUrl(`users/${userId}/avatar`), {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-          body: fileFormData
-        })
-
-        if (!fileResponse.ok) {
-          console.warn('Failed to upload profile picture:', fileResponse.status, fileResponse.statusText)
-
-          // Don't fail the whole operation if just the image upload fails
-          toast('Profile updated but image upload failed', {
-            icon: '⚠️',
-            style: {
-              borderRadius: '10px',
-              background: '#FFF3CD',
-              color: '#856404'
-            }
-          })
-        }
-      }
-
-      toast.success('Profile updated successfully')
-    } catch (err) {
-      console.error('Error updating profile:', err)
-      setError(err instanceof Error ? err.message : 'An unknown error occurred')
-      toast.error('Failed to update profile')
-    } finally {
       setIsLoading(false)
+      toast.success('Profile updated successfully')
+    } catch (error) {
+      setIsLoading(false)
+      setError(error instanceof Error ? error.message : 'An error occurred')
+      console.error('Error updating user:', error)
+      toast.error('Failed to update profile')
     }
   }
 

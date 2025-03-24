@@ -1,6 +1,6 @@
 import fs from 'fs/promises'
 import path from 'path'
-import { createReadStream, stat } from 'fs'
+import { createReadStream, stat, existsSync } from 'fs'
 import { promisify } from 'util'
 
 import { NextResponse } from 'next/server'
@@ -34,17 +34,51 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
     // Join the path segments
     const assetPath = params.path.join('/')
 
-    // Construct the full path to the asset
-    // We'll keep assets in the /public/assets folder
-    const fullPath = path.join(process.cwd(), 'public', 'assets', assetPath)
+    console.log(`Asset request for: ${assetPath}`)
 
-    // Verify the file exists
-    try {
-      await fs.access(fullPath)
-    } catch (error) {
-      console.error(`Asset not found: ${fullPath}`)
+    // Check if this is an avatar request - handle both formats
+    const isAvatar = assetPath.startsWith('avatars/') || assetPath.startsWith('avatar-')
 
-      return new NextResponse('Asset not found', { status: 404 })
+    let fullPath
+
+    if (isAvatar) {
+      // Check multiple possible locations for the avatar file
+      const possiblePaths = [
+        // Direct avatar filename in avatars directory
+        path.join(process.cwd(), 'public', 'assets', 'avatars', assetPath.replace('avatars/', '')),
+
+        // If the path already includes 'avatars/' directory
+        path.join(process.cwd(), 'public', 'assets', assetPath),
+
+        // Try the uploads directory
+        path.join(process.cwd(), 'public', 'uploads', 'avatars', assetPath.replace('avatars/', '')),
+
+        // If its directly in the assets directory
+        path.join(process.cwd(), 'public', 'assets', assetPath)
+      ]
+
+      // Find the first path that exists
+      fullPath = possiblePaths.find(p => existsSync(p))
+
+      if (!fullPath) {
+        console.error(`Avatar not found in any of these locations:`, possiblePaths)
+
+        return new NextResponse('Avatar not found', { status: 404 })
+      }
+
+      console.log(`Found avatar at: ${fullPath}`)
+    } else {
+      // Non-avatar assets are in the public/assets directory
+      fullPath = path.join(process.cwd(), 'public', 'assets', assetPath)
+
+      // Verify the file exists
+      try {
+        await fs.access(fullPath)
+      } catch (error) {
+        console.error(`Asset not found: ${fullPath}`)
+
+        return new NextResponse('Asset not found', { status: 404 })
+      }
     }
 
     // Get file stats
@@ -56,12 +90,15 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
     // Get the mime type
     const contentType = getMimeType(fullPath)
 
+    console.log(`Serving ${fullPath} as ${contentType}`)
+
     // Return the file as a stream with appropriate headers
     return new NextResponse(fileStream as any, {
       headers: {
         'Content-Type': contentType,
         'Content-Length': stats.size.toString(),
-        'Cache-Control': 'public, max-age=86400'
+        'Cache-Control': 'public, max-age=86400',
+        'Content-Disposition': 'inline'
       }
     })
   } catch (error) {

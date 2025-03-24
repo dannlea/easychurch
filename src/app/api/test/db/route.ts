@@ -2,13 +2,19 @@ import { NextResponse } from 'next/server'
 
 import pool, { executeQuery } from '../../db'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
-    // Use the executeQuery helper function to safely handle connections
-    const result = await executeQuery(async conn => {
-      // Simple query to test database connection
-      return await conn.query('SELECT 1 as test')
-    })
+    // Use the executeQuery helper function with a timeout
+    const result = await Promise.race([
+      executeQuery(async conn => {
+        // Simple query to test database connection
+        return await conn.query('SELECT 1 as test')
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Database query timeout after 5 seconds')), 5000))
+    ])
 
     return NextResponse.json({
       status: 'ok',

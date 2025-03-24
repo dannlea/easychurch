@@ -96,20 +96,41 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   try {
     const body = await request.json()
 
+    console.log(`Update request for user ${params.id}:`, body)
+
     // Use executeQuery helper
     await executeQuery(async conn => {
+      // Map the request fields to database columns
+      const fieldMappings: Record<string, string> = {
+        first_name: 'first_name',
+        last_name: 'last_name',
+        email: 'email',
+        organization_name: 'org_id', // This might need special handling
+        phone_number: 'phone_number',
+        address: 'address',
+        state: 'state',
+        zip_code: 'zip_code',
+        country: 'country',
+        language: 'language',
+        time_zone: 'time_zone',
+        currency: 'currency'
+      }
+
       const updateFields = []
       const updateValues = []
 
+      // Process each field from the request body
       for (const [key, value] of Object.entries(body)) {
-        // Skip sensitive fields that shouldn't be updated directly
-        if (!['id', 'password_hash', 'created_at'].includes(key)) {
-          updateFields.push(`${key} = ?`)
+        // Only process fields that have mappings and skip empty values
+        if (fieldMappings[key] && value !== null && value !== undefined && value !== '') {
+          updateFields.push(`${fieldMappings[key]} = ?`)
           updateValues.push(value)
         }
       }
 
       if (updateFields.length === 0) {
+        console.log('No fields to update')
+
         return null
       }
 
@@ -117,7 +138,19 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
       updateValues.push(params.id)
 
-      return await conn.query(sql, updateValues)
+      console.log('Executing SQL:', sql)
+      console.log('With values:', updateValues)
+
+      try {
+        const result = await conn.query(sql, updateValues)
+
+        console.log('Update result:', result)
+
+        return result
+      } catch (dbError) {
+        console.error('Database error during update:', dbError)
+        throw dbError
+      }
     })
 
     return NextResponse.json({ message: 'User updated successfully' })

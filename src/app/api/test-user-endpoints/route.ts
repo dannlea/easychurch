@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const results: Record<string, any> = {}
 
@@ -17,7 +20,14 @@ export async function GET(request: NextRequest) {
     // Test the users/2 endpoint with auth
     try {
       // Try without auth first
-      const response1 = await fetch(`${apiBase}/api/users/2`)
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
+      const response1 = await fetch(`${apiBase}/api/users/2`, {
+        signal: controller.signal
+      })
+
+      clearTimeout(timeout)
 
       results['users/2-no-auth'] = {
         status: response1.status,
@@ -40,12 +50,22 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (error) {
-      results['users/2-no-auth'] = { error: String(error) }
+      results['users/2-no-auth'] = {
+        error: error instanceof Error ? error.message : String(error),
+        type: error instanceof Error ? error.name : 'Unknown'
+      }
     }
 
     // Test the users-simple/2 endpoint
     try {
-      const response2 = await fetch(`${apiBase}/api/users-simple/2`)
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
+      const response2 = await fetch(`${apiBase}/api/users-simple/2`, {
+        signal: controller.signal
+      })
+
+      clearTimeout(timeout)
 
       results['users-simple/2'] = {
         status: response2.status,
@@ -68,12 +88,22 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (error) {
-      results['users-simple/2'] = { error: String(error) }
+      results['users-simple/2'] = {
+        error: error instanceof Error ? error.message : String(error),
+        type: error instanceof Error ? error.name : 'Unknown'
+      }
     }
 
     // Check if the assets route handles /assets correctly
     try {
-      const response3 = await fetch(`${apiBase}/api/assets/avatar-c984ebee-5bc5-4ba4-be3c-ae0f716a9166.png`)
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
+      const response3 = await fetch(`${apiBase}/api/assets/avatar-c984ebee-5bc5-4ba4-be3c-ae0f716a9166.png`, {
+        signal: controller.signal
+      })
+
+      clearTimeout(timeout)
 
       results['assets/avatar'] = {
         status: response3.status,
@@ -83,7 +113,10 @@ export async function GET(request: NextRequest) {
         type: response3.type
       }
     } catch (error) {
-      results['assets/avatar'] = { error: String(error) }
+      results['assets/avatar'] = {
+        error: error instanceof Error ? error.message : String(error),
+        type: error instanceof Error ? error.name : 'Unknown'
+      }
     }
 
     return NextResponse.json({
@@ -99,7 +132,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         message: 'Error testing endpoints',
-        error: String(error)
+        error: error instanceof Error ? error.message : String(error),
+        type: error instanceof Error ? error.name : 'Unknown'
       },
       { status: 500 }
     )

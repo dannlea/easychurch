@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minimal Upload</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      #log {
+        background: #f5f5f5;
+        padding: 10px;
+        border: 1px solid #ddd;
+        margin-top: 20px;
+        white-space: pre-wrap;
+        font-family: monospace;
+        height: 200px;
+        overflow-y: auto;
+      }
+      form {
+        border: 1px solid #ddd;
+        padding: 20px;
+        margin: 20px 0;
+      }
+      button {
+        margin-top: 10px;
+        padding: 8px 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Ultra Minimal File Upload</h1>
+
+    <form id="direct-form" enctype="multipart/form-data">
+      <div>
+        <input type="file" id="file-input" name="avatar" accept="image/*" />
+      </div>
+      <button type="submit">Upload</button>
+    </form>
+
+    <div id="log"></div>
+
+    <script>
+      const form = document.getElementById('direct-form')
+      const log = document.getElementById('log')
+
+      function logMessage(msg) {
+        const time = new Date().toLocaleTimeString()
+        log.textContent += `[${time}] ${msg}\n`
+        log.scrollTop = log.scrollHeight
+        console.log(msg)
+      }
+
+      form.addEventListener('submit', async e => {
+        e.preventDefault()
+
+        logMessage('Form submitted')
+
+        const fileInput = document.getElementById('file-input')
+        const file = fileInput.files[0]
+
+        if (!file) {
+          logMessage('Error: No file selected')
+          return
+        }
+
+        logMessage(`Selected file: ${file.name} (${file.size} bytes, ${file.type})`)
+
+        // Create FormData
+        const formData = new FormData()
+        formData.append('avatar', file)
+
+        // Log FormData content
+        logMessage('FormData created with:')
+        for (const [key, value] of formData.entries()) {
+          if (value instanceof File) {
+            logMessage(`- ${key}: [File] ${value.name}, ${value.size} bytes`)
+          } else {
+            logMessage(`- ${key}: ${value}`)
+          }
+        }
+
+        try {
+          logMessage('Sending request...')
+          const response = await fetch('/api/users/2/avatar', {
+            method: 'POST',
+            body: formData
+          })
+
+          logMessage(`Response status: ${response.status} ${response.statusText}`)
+
+          const data = await response.text()
+          try {
+            // Try to parse as JSON
+            const jsonData = JSON.parse(data)
+            logMessage(`Response data: ${JSON.stringify(jsonData, null, 2)}`)
+          } catch (e) {
+            // If not JSON, show as text
+            logMessage(`Response (not JSON): ${data.substring(0, 200)}`)
+          }
+
+          if (response.ok) {
+            logMessage('✅ Upload successful!')
+          } else {
+            logMessage('❌ Upload failed!')
+          }
+        } catch (error) {
+          logMessage(`Error: ${error.message}`)
+        }
+      })
+
+      logMessage('Page loaded. Ready to upload.')
+    </script>
+  </body>
+</html>

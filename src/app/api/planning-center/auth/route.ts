@@ -27,7 +27,7 @@ export async function GET() {
 
     //console.log('Generated Authorization URL:', authUrl)
 
-    // Redirect to the Planning Center authorization page
+    // Always redirect to Planning Center's authorization page
     return NextResponse.redirect(authUrl)
   } catch (error: any) {
     console.error('Auth route error:', error)

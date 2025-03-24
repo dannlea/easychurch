@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Avatar Path Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .test-case {
+        margin-bottom: 30px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      h2 {
+        margin-top: 0;
+      }
+      .avatar {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 1px solid #ccc;
+      }
+      .path {
+        font-family: monospace;
+        background-color: #f5f5f5;
+        padding: 5px;
+        border-radius: 3px;
+        margin: 10px 0;
+      }
+      .status {
+        font-weight: bold;
+      }
+      .success {
+        color: green;
+      }
+      .error {
+        color: red;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Avatar Path Test</h1>
+    <p>This page tests different avatar path formats to ensure they display correctly.</p>
+
+    <div class="test-case">
+      <h2>Format 1: /assets/avatars/filename.png</h2>
+      <div class="path">/assets/avatars/avatar-b6d473c6-10f8-4398-b4e0-0191debe0e5e.png</div>
+      <img
+        class="avatar"
+        src="/assets/avatars/avatar-b6d473c6-10f8-4398-b4e0-0191debe0e5e.png"
+        alt="Avatar"
+        onerror="this.parentNode.querySelector('.status').innerHTML='❌ Failed to load'; this.parentNode.querySelector('.status').className='status error';"
+        onload="this.parentNode.querySelector('.status').innerHTML='✓ Loaded successfully'; this.parentNode.querySelector('.status').className='status success';"
+      />
+      <div class="status">Loading...</div>
+    </div>
+
+    <div class="test-case">
+      <h2>Format 2: assets/avatars/filename.png (no leading slash)</h2>
+      <div class="path">assets/avatars/avatar-b6d473c6-10f8-4398-b4e0-0191debe0e5e.png</div>
+      <img
+        class="avatar"
+        src="assets/avatars/avatar-b6d473c6-10f8-4398-b4e0-0191debe0e5e.png"
+        alt="Avatar"
+        onerror="this.parentNode.querySelector('.status').innerHTML='❌ Failed to load'; this.parentNode.querySelector('.status').className='status error';"
+        onload="this.parentNode.querySelector('.status').innerHTML='✓ Loaded successfully'; this.parentNode.querySelector('.status').className='status success';"
+      />
+      <div class="status">Loading...</div>
+    </div>
+
+    <div class="test-case">
+      <h2>Format 3: /uploads/avatars/filename.png</h2>
+      <div class="path">/uploads/avatars/avatar-b6d473c6-10f8-4398-b4e0-0191debe0e5e.png</div>
+      <img
+        class="avatar"
+        src="/uploads/avatars/avatar-b6d473c6-10f8-4398-b4e0-0191debe0e5e.png"
+        alt="Avatar"
+        onerror="this.parentNode.querySelector('.status').innerHTML='❌ Failed to load'; this.parentNode.querySelector('.status').className='status error';"
+        onload="this.parentNode.querySelector('.status').innerHTML='✓ Loaded successfully'; this.parentNode.querySelector('.status').className='status success';"
+      />
+      <div class="status">Loading...</div>
+    </div>
+
+    <div class="test-case">
+      <h2>Format 4: /api/assets/avatars/filename.png</h2>
+      <div class="path">/api/assets/avatars/avatar-b6d473c6-10f8-4398-b4e0-0191debe0e5e.png</div>
+      <img
+        class="avatar"
+        src="/api/assets/avatars/avatar-b6d473c6-10f8-4398-b4e0-0191debe0e5e.png"
+        alt="Avatar"
+        onerror="this.parentNode.querySelector('.status').innerHTML='❌ Failed to load'; this.parentNode.querySelector('.status').className='status error';"
+        onload="this.parentNode.querySelector('.status').innerHTML='✓ Loaded successfully'; this.parentNode.querySelector('.status').className='status success';"
+      />
+      <div class="status">Loading...</div>
+    </div>
+
+    <script>
+      // Add the actual avatar files used in the page
+      const avatarFiles = document.querySelectorAll('.avatar')
+      for (let i = 0; i < avatarFiles.length; i++) {
+        console.log(`Testing image load for: ${avatarFiles[i].src}`)
+      }
+    </script>
+  </body>
+</html>
