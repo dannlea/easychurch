@@ -26,6 +26,9 @@ import MenuItem from '@mui/material/MenuItem'
 import PrintIcon from '@mui/icons-material/Print'
 import axios from 'axios'
 
+// Custom Hooks
+import { usePlanningCenterAuth } from '@/hooks/usePlanningCenterAuth'
+
 // Define the structure of a birthday record
 interface BirthdayRecord {
   id: string
@@ -118,33 +121,28 @@ const BirthdayTable = () => {
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<BirthdayRecord[]>([])
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
+  const { handlePlanningCenterRequest } = usePlanningCenterAuth()
 
   // Function to fetch birthdays from Planning Center
-  const fetchBirthdays = async (retryCount = 0) => {
+  const fetchBirthdays = async () => {
     try {
       setLoading(true)
       setError(null)
 
       console.log('Fetching birthdays from Planning Center...')
 
-      const response = await axios.get('/api/planning-center/people')
+      await handlePlanningCenterRequest(async () => {
+        const response = await axios.get('/api/planning-center/people')
 
-      if (!response.data || !Array.isArray(response.data)) {
-        throw new Error('Invalid data format received from API')
-      }
+        if (!response.data || !Array.isArray(response.data)) {
+          throw new Error('Invalid data format received from API')
+        }
 
-      setData(response.data)
-      setLoading(false)
+        setData(response.data)
+        setLoading(false)
+      })
     } catch (error: any) {
       console.error('Error fetching birthdays:', error)
-
-      if (error.response?.status === 401 && retryCount < 1) {
-        console.log('Unauthorized, redirecting to Planning Center auth...')
-        window.location.href = '/api/planning-center/auth'
-
-        return
-      }
-
       setError(`Failed to load birthday data: ${error.message}`)
       setLoading(false)
     }

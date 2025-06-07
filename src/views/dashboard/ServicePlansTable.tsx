@@ -30,6 +30,7 @@ import FolderIcon from '@mui/icons-material/Folder'
 import AccountCircleIcon from '@mui/icons-material/AccountCircle'
 import MicIcon from '@mui/icons-material/Mic'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
+import InfoIcon from '@mui/icons-material/Info'
 
 // Third-party Imports
 import axios from 'axios'
@@ -61,6 +62,7 @@ interface ServicePlan {
     key?: string
     bpm?: number
     sequence?: number | null
+    description?: string
   }[]
   teams: {
     id: string
@@ -167,6 +169,31 @@ const ServicePlansTable = () => {
 
   const handleServiceTypeChange = (event: SelectChangeEvent) => {
     setSelectedServiceType(event.target.value)
+  }
+
+  const handleViewDetails = (plan: ServicePlan) => {
+    // Transform the data for the details page
+    const songs = plan.songs.map(song => ({
+      title: song.title,
+      key: song.key || '',
+      description: song.description || ''
+    }))
+
+    const volunteers = {
+      speakers: plan.keyPeople.filter(person => person.position.toLowerCase().includes('speaker')),
+      vocalists: plan.keyPeople.filter(person => person.position.toLowerCase().includes('vocal')),
+      band: plan.keyPeople.filter(
+        person => person.position.toLowerCase().includes('band') || person.position.toLowerCase().includes('instrument')
+      )
+    }
+
+    // Navigate to the details page with the transformed data
+    const queryString = new URLSearchParams({
+      songs: JSON.stringify(songs),
+      volunteers: JSON.stringify(volunteers)
+    }).toString()
+
+    router.push(`/service-details?${queryString}`)
   }
 
   return (
@@ -301,6 +328,14 @@ const ServicePlansTable = () => {
                     </Box>
 
                     <IconButton
+                      onClick={() => handleViewDetails(plan)}
+                      size='small'
+                      sx={{ color: 'secondary.main', ml: 1 }}
+                    >
+                      <InfoIcon />
+                    </IconButton>
+
+                    <IconButton
                       component='a'
                       href={plan.planningCenterUrl}
                       target='_blank'
@@ -349,7 +384,7 @@ const ServicePlansTable = () => {
                                 <Chip
                                   label={person.status}
                                   size='small'
-                                  color={person.status === 'confirmed' ? 'success' : 'warning'}
+                                  color={person.status === 'c' ? 'success' : 'warning'}
                                   sx={{ ml: 1, height: 16, fontSize: '0.6rem' }}
                                 />
                               )}

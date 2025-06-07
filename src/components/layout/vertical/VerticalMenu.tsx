@@ -69,11 +69,11 @@ const VerticalMenu = ({ scrollMenu }: { scrollMenu: (container: any, isPerfectSc
           <MenuItem href='/birthdays' icon={<i className='ri-cake-line' />}>
             Birthdays Mailing List
           </MenuItem>
+          <MenuItem href='/services/dashboard' icon={<i className='ri-dashboard-line' />}>
+            Service Dashboard
+          </MenuItem>
           <MenuItem href='/services' icon={<i className='ri-calendar-event-line' />}>
             Service Plans
-          </MenuItem>
-          <MenuItem href='/sermon-planner' icon={<i className='ri-book-line' />}>
-            Sermon Planner
           </MenuItem>
         </MenuSection>
         <MenuSection label='Apps & Pages'>
