@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, Suspense } from 'react'
 
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -204,4 +204,11 @@ const ServiceDetails = () => {
   )
 }
 
-export default ServiceDetails
+// Wrap in Suspense boundary for Next.js compliance
+const ServiceDetailsPage = () => (
+  <Suspense fallback={<div>Loading service details...</div>}>
+    <ServiceDetails />
+  </Suspense>
+)
+
+export default ServiceDetailsPage

@@ -85,7 +85,7 @@ const AccountDetails = () => {
       setError(null)
 
       // Get user ID from URL params if available, otherwise use user context
-      const urlUserId = searchParams.get('id')
+      const urlUserId = searchParams ? searchParams.get('id') : null
       const userId = urlUserId || (user?.id ? String(user.id) : null)
 
       // If no user ID found, exit early
@@ -237,7 +237,7 @@ const AccountDetails = () => {
 
     try {
       // Get user ID from URL params if available, otherwise use user context
-      const urlUserId = searchParams.get('id')
+      const urlUserId = searchParams ? searchParams.get('id') : null
       const userId = urlUserId || (user?.id ? String(user.id) : null)
 
       if (!userId) {
@@ -329,7 +329,7 @@ const AccountDetails = () => {
 
     try {
       // Get user ID from URL params if available, otherwise use user context
-      const urlUserId = searchParams.get('id')
+      const urlUserId = searchParams ? searchParams.get('id') : null
       const userId = urlUserId || (user?.id ? String(user.id) : null)
 
       if (!userId) {

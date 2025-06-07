@@ -3,10 +3,8 @@ const nextConfig = {
   // ... existing code ...
   experimental: {
     // ... existing experimental options ...
-    staticPageGenerationTimeout: 120 // Increase timeout to 120 seconds
-  }
-
-  // ... existing code ...
+  },
+  staticPageGenerationTimeout: 120 // Move timeout to root level
 }
 
 module.exports = nextConfig

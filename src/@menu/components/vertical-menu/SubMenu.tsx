@@ -188,20 +188,19 @@ const SubMenu: ForwardRefRenderFunction<HTMLLIElement, SubMenuProps> = (props, r
   }
 
   useEffect(() => {
-    if (confirmUrlInChildren(children, pathname)) {
+    if (pathname && confirmUrlInChildren(children, pathname)) {
       openSubmenusRef?.current.push({ level, label, active: true, id })
     } else {
       if (defaultOpen) {
         openSubmenusRef?.current.push({ level, label, active: false, id })
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [children, pathname, level, label, id, defaultOpen, openSubmenusRef])
 
   // Change active state when the url changes
   useEffect(() => {
     // Check if the current url matches any of the children urls
-    if (confirmUrlInChildren(children, pathname)) {
+    if (pathname && confirmUrlInChildren(children, pathname)) {
       setActive(true)
 
       if (openSubmenusRef?.current.findIndex(submenu => submenu.id === id) === -1) {
