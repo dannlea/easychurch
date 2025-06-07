@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import '@/styles/print.css'
 
 // MUI Imports
@@ -124,7 +124,7 @@ const BirthdayTable = () => {
   const { handlePlanningCenterRequest } = usePlanningCenterAuth()
 
   // Function to fetch birthdays from Planning Center
-  const fetchBirthdays = async () => {
+  const fetchBirthdays = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -146,7 +146,7 @@ const BirthdayTable = () => {
       setError(`Failed to load birthday data: ${error.message}`)
       setLoading(false)
     }
-  }
+  }, [handlePlanningCenterRequest])
 
   useEffect(() => {
     fetchBirthdays()

@@ -38,9 +38,10 @@ const ServiceDetails = () => {
 
   useEffect(() => {
     try {
-      const songs = JSON.parse(searchParams.get('songs') || '[]') as Song[]
+      const songs = JSON.parse(searchParams?.get('songs') || '[]') as Song[]
+
       const volunteers = JSON.parse(
-        searchParams.get('volunteers') || '{"speakers":[],"vocalists":[],"band":[]}'
+        searchParams?.get('volunteers') || '{"speakers":[],"vocalists":[],"band":[]}'
       ) as ServiceDetailsData['volunteers']
 
       setData({ songs, volunteers })
