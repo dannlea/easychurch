@@ -150,7 +150,7 @@ const BirthdayTable = () => {
 
   useEffect(() => {
     fetchBirthdays()
-  }, [])
+  }, [fetchBirthdays])
 
   const handlePrint = () => {
     window.print()

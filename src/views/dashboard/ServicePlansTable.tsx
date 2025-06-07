@@ -121,6 +121,9 @@ const ServicePlansTable = () => {
 
         const plans: ServicePlan[] = response.data
 
+        console.log('Raw API Response:', response.data)
+        console.log('First plan times example:', plans[0]?.planTimes)
+
         setServicePlans(plans)
         setFilteredPlans(plans)
 
@@ -281,26 +284,32 @@ const ServicePlansTable = () => {
                   <Grid item xs={12} md={4}>
                     <Box display='flex' alignItems='center'>
                       <EventIcon sx={{ mr: 1, color: 'primary.main' }} />
-                      <Typography variant='body2'>{plan.dates.formatted}</Typography>
-                    </Box>
-                    {plan.formattedTimes ? (
-                      <Box display='flex' alignItems='center'>
-                        <AccessTimeIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1rem' }} />
-                        <Typography variant='body2' color='text.secondary'>
-                          {plan.formattedTimes}
-                        </Typography>
-                      </Box>
-                    ) : plan.planTimes.length > 0 ? (
-                      <Box display='flex' alignItems='center'>
-                        <AccessTimeIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1rem' }} />
-                        <Typography variant='body2' color='text.secondary'>
-                          {plan.planTimes.map(time => time.timeFormatted).join(' & ')}
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography variant='body2' color='text.secondary' sx={{ fontStyle: 'italic' }}>
-                        No times scheduled
+                      <Typography variant='body2' color='text.secondary'>
+                        {plan.dates?.formatted}
                       </Typography>
+                    </Box>
+                    {plan.planTimes && plan.planTimes.length > 0 && (
+                      <Box display='flex' alignItems='center'>
+                        <AccessTimeIcon sx={{ mr: 1, color: 'text.secondary', fontSize: '1rem' }} />
+                        <Typography variant='body2' color='text.secondary'>
+                          {plan.planTimes
+                            .map(
+                              time =>
+                                time.timeFormatted ||
+                                (() => {
+                                  const start = new Date(time.startsAt)
+                                  const end = new Date(time.endsAt)
+
+                                  if (!time.startsAt || !time.endsAt || isNaN(start.getTime()) || isNaN(end.getTime()))
+                                    return ''
+
+                                  return `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                })()
+                            )
+                            .filter(Boolean)
+                            .join(' & ')}
+                        </Typography>
+                      </Box>
                     )}
                   </Grid>
                   <Grid item xs={12} md={4} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
