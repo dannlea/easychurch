@@ -10,17 +10,18 @@ const pool = mariadb.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  connectionLimit: isProduction ? 3 : 2, // Slightly higher for production
-  acquireTimeout: 40000, // Increase timeout to 40 seconds for Render
+  connectionLimit: isProduction ? 5 : 2, // Increased for production
+  acquireTimeout: 20000, // Reduced to 20 seconds
   idleTimeout: 30000,
-  connectTimeout: 20000
+  connectTimeout: 10000, // Reduced to 10 seconds
+  trace: isProduction // Enable tracing in production for better debugging
 })
 
-console.log(`Database pool created with connection limit: ${isProduction ? 3 : 2}`)
+console.log(`Database pool created with connection limit: ${isProduction ? 5 : 2}`)
 console.log(
   `Database connection parameters: Host=${process.env.DB_HOST}, User=${process.env.DB_USER}, DB=${process.env.DB_NAME}`
 )
-console.log(`Timeouts: acquire=${40000}ms, idle=${30000}ms, connect=${20000}ms`)
+console.log(`Timeouts: acquire=${20000}ms, idle=${30000}ms, connect=${10000}ms`)
 
 // Add a shutdown handler to properly close all connections when the app is terminated
 if (typeof process !== 'undefined') {

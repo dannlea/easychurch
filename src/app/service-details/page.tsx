@@ -4,7 +4,18 @@ import React, { useEffect, useState } from 'react'
 
 import { useRouter, useSearchParams } from 'next/navigation'
 
-import { Box, Card, CardContent, Typography, Grid, Chip, Divider, IconButton, CircularProgress } from '@mui/material'
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Grid,
+  Chip,
+  Divider,
+  IconButton,
+  CircularProgress,
+  Button
+} from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import MusicNoteIcon from '@mui/icons-material/MusicNote'
 import MicIcon from '@mui/icons-material/Mic'
@@ -35,21 +46,41 @@ const ServiceDetails = () => {
   const searchParams = useSearchParams()
   const [data, setData] = useState<ServiceDetailsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    try {
-      const songs = JSON.parse(searchParams?.get('songs') || '[]') as Song[]
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
 
-      const volunteers = JSON.parse(
-        searchParams?.get('volunteers') || '{"speakers":[],"vocalists":[],"band":[]}'
-      ) as ServiceDetailsData['volunteers']
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Data loading timeout')), 15000)
+        )
 
-      setData({ songs, volunteers })
-    } catch (error) {
-      console.error('Error parsing service details data:', error)
-    } finally {
-      setLoading(false)
+        const dataPromise = (async () => {
+          const songs = JSON.parse(searchParams?.get('songs') || '[]') as Song[]
+
+          const volunteers = JSON.parse(
+            searchParams?.get('volunteers') || '{"speakers":[],"vocalists":[],"band":[]}'
+          ) as ServiceDetailsData['volunteers']
+
+          return { songs, volunteers }
+        })()
+
+        const result = await Promise.race([dataPromise, timeoutPromise])
+
+        setData(result as ServiceDetailsData)
+      } catch (error) {
+        console.error('Error loading service details:', error)
+        setError(error instanceof Error ? error.message : 'Failed to load service details')
+      } finally {
+        setLoading(false)
+      }
     }
+
+    loadData()
   }, [searchParams])
 
   const handleBack = () => {
@@ -60,6 +91,20 @@ const ServiceDetails = () => {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
+      </Box>
+    )
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 4 }}>
+        <IconButton onClick={handleBack} sx={{ mb: 2 }}>
+          <ArrowBackIcon />
+        </IconButton>
+        <Typography color='error'>{error}</Typography>
+        <Button variant='contained' onClick={() => window.location.reload()} sx={{ mt: 2 }}>
+          Retry
+        </Button>
       </Box>
     )
   }
